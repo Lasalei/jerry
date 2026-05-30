@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="0" fill="#0B8457"/>
+  <!-- Jersey silhouette, centered within the maskable safe zone -->
+  <g fill="#ffffff">
+    <path d="M256 120
+             c-26 0 -47 14 -58 22
+             l-78 30
+             a18 18 0 0 0 -11 17
+             l4 70
+             a14 14 0 0 0 16 13
+             l34 -5
+             v118
+             a20 20 0 0 0 20 20
+             h146
+             a20 20 0 0 0 20 -20
+             v-118
+             l34 5
+             a14 14 0 0 0 16 -13
+             l4 -70
+             a18 18 0 0 0 -11 -17
+             l-78 -30
+             c-11 -8 -32 -22 -58 -22
+             z
+             m0 30
+             c14 0 26 8 34 14
+             a36 36 0 0 1 -68 0
+             c8 -6 20 -14 34 -14
+             z"/>
+  </g>
+  <!-- Number on the jersey -->
+  <text x="256" y="372" font-family="Oswald, Arial Narrow, sans-serif" font-weight="700"
+        font-size="120" fill="#0B8457" text-anchor="middle">10</text>
+</svg>
