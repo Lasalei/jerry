@@ -21,6 +21,8 @@ export type TxType = 'salg' | 'gitt_bort'
 export interface Style {
   id: string
   name: string
+  /** Optional photo as a downscaled data URL (base64 JPEG). null = no photo. */
+  imageUrl: string | null
   created_at: string
 }
 

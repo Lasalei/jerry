@@ -18,8 +18,13 @@ interface StoreValue {
   /** total remaining across all SKUs of a style. */
   styleTotal: (styleId: string) => number
   // actions
-  addStyle: (name: string, grid: GridCell[]) => Promise<void>
-  updateStyle: (id: string, name: string, grid: GridCell[]) => Promise<void>
+  addStyle: (name: string, grid: GridCell[], imageUrl: string | null) => Promise<void>
+  updateStyle: (
+    id: string,
+    name: string,
+    grid: GridCell[],
+    imageUrl: string | null,
+  ) => Promise<void>
   deleteStyle: (id: string) => Promise<void>
   addTransaction: (tx: NewTransaction) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
@@ -86,12 +91,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loading,
       available,
       styleTotal,
-      addStyle: async (name, grid) => {
-        await db.addStyle(name, grid)
+      addStyle: async (name, grid, imageUrl) => {
+        await db.addStyle(name, grid, imageUrl)
         await reload()
       },
-      updateStyle: async (id, name, grid) => {
-        await db.updateStyle(id, name, grid)
+      updateStyle: async (id, name, grid, imageUrl) => {
+        await db.updateStyle(id, name, grid, imageUrl)
         await reload()
       },
       deleteStyle: async (id) => {

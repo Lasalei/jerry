@@ -93,20 +93,26 @@ export class LocalStorageDB implements DraktlagerDB {
     return this.read()
   }
 
-  async addStyle(name: string, grid: GridCell[]): Promise<Style> {
+  async addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style> {
     const data = this.read()
-    const style: Style = { id: uid(), name: name.trim(), created_at: nowISO() }
+    const style: Style = { id: uid(), name: name.trim(), imageUrl, created_at: nowISO() }
     data.styles.push(style)
     data.stock.push(...fullGridFor(style.id, grid))
     this.write(data)
     return style
   }
 
-  async updateStyle(id: string, name: string, grid: GridCell[]): Promise<void> {
+  async updateStyle(
+    id: string,
+    name: string,
+    grid: GridCell[],
+    imageUrl: string | null,
+  ): Promise<void> {
     const data = this.read()
     const style = data.styles.find((s) => s.id === id)
     if (!style) throw new Error('Fant ikke stilen')
     style.name = name.trim()
+    style.imageUrl = imageUrl
 
     const desired = new Map(grid.map((c) => [`${c.variant}__${c.size}`, c.qty]))
     for (const unit of data.stock) {

@@ -49,14 +49,14 @@ export function Lager() {
     )
   }
 
-  async function handleSaveNew(name: string, grid: GridCell[]) {
-    await addStyle(name, grid)
+  async function handleSaveNew(name: string, grid: GridCell[], imageUrl: string | null) {
+    await addStyle(name, grid, imageUrl)
     toast('Stil lagt til')
   }
 
-  async function handleSaveEdit(name: string, grid: GridCell[]) {
+  async function handleSaveEdit(name: string, grid: GridCell[], imageUrl: string | null) {
     if (!editing) return
-    await updateStyle(editing.id, name, grid)
+    await updateStyle(editing.id, name, grid, imageUrl)
     toast('Stil oppdatert')
   }
 
@@ -120,7 +120,22 @@ export function Lager() {
                 onClick={() => setExpanded(isOpen ? null : style.id)}
                 className="flex w-full items-center justify-between gap-3 p-4 text-left"
               >
-                <span className="truncate font-semibold text-ink">{style.name}</span>
+                <span className="flex min-w-0 items-center gap-3">
+                  {style.imageUrl ? (
+                    <img
+                      src={style.imageUrl}
+                      alt=""
+                      className="h-11 w-11 shrink-0 rounded-lg border border-line object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas text-muted">
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 7l9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className="truncate font-semibold text-ink">{style.name}</span>
+                </span>
                 <span className="flex items-center gap-2">
                   <span
                     className={`font-display text-xl font-bold tnum ${
@@ -145,6 +160,13 @@ export function Lager() {
 
               {isOpen && (
                 <div className="border-t border-line p-3 anim-slide-up">
+                  {style.imageUrl && (
+                    <img
+                      src={style.imageUrl}
+                      alt={style.name}
+                      className="mb-3 max-h-56 w-full rounded-xl border border-line object-contain bg-canvas"
+                    />
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-center text-sm">
                       <thead>

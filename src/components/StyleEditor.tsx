@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { SIZES, VARIANTS } from '../lib/constants'
+import { fileToCompressedDataUrl } from '../lib/image'
 import type { GridCell, Style, StockUnit } from '../lib/types'
 
 type GridMap = Record<string, string>
@@ -31,12 +32,26 @@ export function StyleEditor({
 }: {
   style: Style | null
   stock: StockUnit[]
-  onSave: (name: string, grid: GridCell[]) => Promise<void>
+  onSave: (name: string, grid: GridCell[], imageUrl: string | null) => Promise<void>
   onClose: () => void
 }) {
   const [name, setName] = useState(style?.name ?? '')
   const [grid, setGrid] = useState<GridMap>(() => buildInitialGrid(stock))
+  const [imageUrl, setImageUrl] = useState<string | null>(style?.imageUrl ?? null)
+  const [imgBusy, setImgBusy] = useState(false)
   const [saving, setSaving] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handlePickImage(file: File) {
+    setImgBusy(true)
+    try {
+      setImageUrl(await fileToCompressedDataUrl(file))
+    } catch {
+      // ignore — keep the previous image
+    } finally {
+      setImgBusy(false)
+    }
+  }
 
   const total = useMemo(
     () => Object.values(grid).reduce((sum, v) => sum + (Number(v) || 0), 0),
@@ -58,7 +73,7 @@ export function StyleEditor({
       }
     }
     try {
-      await onSave(name.trim(), cells)
+      await onSave(name.trim(), cells, imageUrl)
       onClose()
     } finally {
       setSaving(false)
@@ -103,6 +118,59 @@ export function StyleEditor({
             autoFocus={!style}
             className="w-full rounded-xl border border-line bg-surface px-3 py-3 focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
           />
+        </div>
+
+        {/* Photo */}
+        <div>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+            Bilde
+          </span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void handlePickImage(file)
+              e.target.value = ''
+            }}
+          />
+          {imageUrl ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={imageUrl}
+                alt=""
+                className="h-24 w-24 shrink-0 rounded-xl border border-line object-cover"
+              />
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={imgBusy}
+                  className="rounded-xl border border-line px-3 py-2 text-sm font-semibold text-ink active:bg-canvas disabled:opacity-40"
+                >
+                  {imgBusy ? 'Behandler…' : 'Bytt bilde'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(null)}
+                  className="rounded-xl border border-line px-3 py-2 text-sm font-semibold text-danger active:bg-canvas"
+                >
+                  Fjern bilde
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={imgBusy}
+              className="flex h-24 w-full items-center justify-center rounded-xl border border-dashed border-kit text-sm font-semibold text-kit active:bg-kit-50 disabled:opacity-40"
+            >
+              {imgBusy ? 'Behandler…' : '+ Legg til bilde'}
+            </button>
+          )}
         </div>
 
         {VARIANTS.map((variant) => (

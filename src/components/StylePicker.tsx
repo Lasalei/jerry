@@ -79,11 +79,20 @@ export function StylePicker({
                   e.preventDefault()
                   pick(s.id)
                 }}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-3 text-left hover:bg-kit-50 ${
+                className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-kit-50 ${
                   s.id === value ? 'bg-kit-50' : ''
                 }`}
               >
-                <span className="truncate text-ink">{s.name}</span>
+                <span className="flex min-w-0 items-center gap-2.5">
+                  {s.imageUrl && (
+                    <img
+                      src={s.imageUrl}
+                      alt=""
+                      className="h-8 w-8 shrink-0 rounded-md border border-line object-cover"
+                    />
+                  )}
+                  <span className="truncate text-ink">{s.name}</span>
+                </span>
                 <span
                   className={`shrink-0 text-sm tnum ${
                     total === 0 ? 'text-muted' : 'text-kit'

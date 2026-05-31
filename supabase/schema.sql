@@ -10,6 +10,7 @@
 create table if not exists styles (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
+  image_url   text,                          -- optional photo as a data URL
   created_at  timestamptz not null default now()
 );
 
@@ -152,9 +153,10 @@ begin
   delete from transactions; -- items cascade
   delete from styles;       -- stock cascades
 
-  insert into styles (id, name, created_at)
+  insert into styles (id, name, image_url, created_at)
   select (s->>'id')::uuid,
          s->>'name',
+         nullif(s->>'imageUrl', ''),
          coalesce((s->>'created_at')::timestamptz, now())
   from jsonb_array_elements(payload->'styles') s;
 

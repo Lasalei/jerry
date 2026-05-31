@@ -24,10 +24,15 @@ export interface DraktlagerDB {
   getAll(): Promise<DataSnapshot>
 
   /** Create a style and its stock grid (one SKU per variant × size). */
-  addStyle(name: string, grid: GridCell[]): Promise<Style>
+  addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style>
 
-  /** Rename a style and/or update its stock grid quantities. */
-  updateStyle(id: string, name: string, grid: GridCell[]): Promise<void>
+  /** Rename a style, update its stock grid, and/or change its photo. */
+  updateStyle(
+    id: string,
+    name: string,
+    grid: GridCell[],
+    imageUrl: string | null,
+  ): Promise<void>
 
   /** Delete a style and its stock. Transaction history is preserved (snapshot). */
   deleteStyle(id: string): Promise<void>

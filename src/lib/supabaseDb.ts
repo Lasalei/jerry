@@ -26,6 +26,13 @@ import { readLocalSnapshot, writeLocalSnapshot } from './localDb'
 
 const TABLES = ['styles', 'stock', 'transactions', 'transaction_items'] as const
 
+interface StyleRow {
+  id: string
+  name: string
+  image_url: string | null
+  created_at: string
+}
+
 interface ItemRow {
   transaction_id: string
   style_id: string | null
@@ -87,7 +94,12 @@ export class SupabaseDB implements DraktlagerDB {
       }
 
       const snapshot: DataSnapshot = {
-        styles: (styles.data ?? []) as Style[],
+        styles: ((styles.data ?? []) as StyleRow[]).map((s) => ({
+          id: s.id,
+          name: s.name,
+          imageUrl: s.image_url ?? null,
+          created_at: s.created_at,
+        })),
         stock: (stock.data ?? []) as StockUnit[],
         transactions: ((txs.data ?? []) as TxRow[]).map((t) => ({
           id: t.id,
@@ -119,10 +131,10 @@ export class SupabaseDB implements DraktlagerDB {
     }
   }
 
-  async addStyle(name: string, grid: GridCell[]): Promise<Style> {
+  async addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style> {
     const { data: style, error } = await this.sb
       .from('styles')
-      .insert({ name: name.trim() })
+      .insert({ name: name.trim(), image_url: imageUrl })
       .select()
       .single()
     if (error) throw error
@@ -142,13 +154,19 @@ export class SupabaseDB implements DraktlagerDB {
     const { error: stockErr } = await this.sb.from('stock').insert(rows)
     if (stockErr) throw stockErr
 
-    return style as Style
+    const s = style as StyleRow
+    return { id: s.id, name: s.name, imageUrl: s.image_url ?? null, created_at: s.created_at }
   }
 
-  async updateStyle(id: string, name: string, grid: GridCell[]): Promise<void> {
+  async updateStyle(
+    id: string,
+    name: string,
+    grid: GridCell[],
+    imageUrl: string | null,
+  ): Promise<void> {
     const { error: nameErr } = await this.sb
       .from('styles')
-      .update({ name: name.trim() })
+      .update({ name: name.trim(), image_url: imageUrl })
       .eq('id', id)
     if (nameErr) throw nameErr
 
