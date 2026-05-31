@@ -6,6 +6,7 @@ import { Gate } from './components/Gate'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { NyttSalg } from './screens/NyttSalg'
 import { Lager } from './screens/Lager'
+import { Ordre } from './screens/Ordre'
 import { Logg } from './screens/Logg'
 import { Mer } from './screens/Mer'
 import { useStore } from './store'
@@ -16,6 +17,8 @@ function Screen({ tab }: { tab: TabId }) {
       return <NyttSalg />
     case 'lager':
       return <Lager />
+    case 'ordre':
+      return <Ordre />
     case 'logg':
       return <Logg />
     case 'mer':
@@ -25,7 +28,12 @@ function Screen({ tab }: { tab: TabId }) {
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('salg')
-  const { loading } = useStore()
+  const { loading, data } = useStore()
+
+  // Outstanding orders = a shipping carrier set and not yet handled.
+  const outstandingOrders = data.transactions.filter(
+    (t) => t.carrier !== null && !t.sent,
+  ).length
 
   return (
     <Gate>
@@ -42,7 +50,11 @@ export default function App() {
               <Screen tab={tab} />
             )}
           </main>
-          <BottomNav active={tab} onChange={setTab} />
+          <BottomNav
+            active={tab}
+            onChange={setTab}
+            badges={{ ordre: outstandingOrders }}
+          />
           <UpdatePrompt />
         </div>
       </ConfirmProvider>

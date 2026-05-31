@@ -48,6 +48,8 @@ export function exportSalesCSV(data: DataSnapshot) {
     'Sum',
     'Frakt',
     'Sporingskode',
+    'Hentedato',
+    'Sendt',
     'Notat',
   ]
 
@@ -74,6 +76,8 @@ export function exportSalesCSV(data: DataSnapshot) {
           tx.type === 'salg' ? it.price * it.qty : 0,
           tx.carrier ?? '',
           tx.trackingCode ?? '',
+          tx.pickupDate ?? '',
+          tx.carrier ? (tx.sent ? 'Ja' : 'Nei') : '',
           tx.note,
         ]
           .map(csvField)

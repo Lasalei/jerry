@@ -23,6 +23,10 @@ interface StoreValue {
   deleteStyle: (id: string) => Promise<void>
   addTransaction: (tx: NewTransaction) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
+  updateOrder: (
+    id: string,
+    patch: { pickupDate?: string | null; sent?: boolean },
+  ) => Promise<void>
   importData: (snapshot: DataSnapshot) => Promise<void>
 }
 
@@ -100,6 +104,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       deleteTransaction: async (id) => {
         await db.deleteTransaction(id)
+        await reload()
+      },
+      updateOrder: async (id, patch) => {
+        await db.updateOrder(id, patch)
         await reload()
       },
       importData: async (snapshot) => {

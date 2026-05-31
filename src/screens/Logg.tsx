@@ -149,7 +149,12 @@ export function Logg() {
                               <span className="tnum text-ink">{tx.trackingCode}</span>
                             </>
                           )}
+                          {' · '}
+                          {tx.sent ? 'Sendt ✓' : 'Ikke sendt'}
                         </div>
+                      )}
+                      {tx.carrier === 'Helthjem' && tx.pickupDate && (
+                        <div>Hentedato: {formatDate(tx.pickupDate)}</div>
                       )}
                       {tx.note && <div>Notat: {tx.note}</div>}
                     </div>

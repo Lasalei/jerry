@@ -43,6 +43,7 @@ export function NyttSalg() {
   // '' represents "Ingen frakt" (no shipping).
   const [carrier, setCarrier] = useState<Carrier | ''>('')
   const [trackingCode, setTrackingCode] = useState('')
+  const [pickupDate, setPickupDate] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -92,6 +93,7 @@ export function NyttSalg() {
     setBuyer('')
     setCarrier('')
     setTrackingCode('')
+    setPickupDate('')
     setNote('')
     // keep channel + payment as-is for fast repeat logging
   }
@@ -119,6 +121,7 @@ export function NyttSalg() {
         payment,
         carrier: carrier || null,
         trackingCode,
+        pickupDate: carrier === 'Helthjem' ? pickupDate || null : null,
         note,
         items: txItems,
       })
@@ -366,6 +369,17 @@ export function NyttSalg() {
               </Field>
             )}
           </div>
+
+          {carrier === 'Helthjem' && (
+            <Field label="Hentedato (Helthjem)">
+              <input
+                type="date"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+                className={controlClass}
+              />
+            </Field>
+          )}
 
           <Field label="Notat">
             <textarea

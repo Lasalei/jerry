@@ -31,6 +31,8 @@ create table if not exists transactions (
   payment        text,
   carrier        text,                       -- shipping carrier, null = no shipping
   tracking_code  text not null default '',   -- free-text shipment/tracking code
+  pickup_date    date,                       -- Helthjem scheduled pickup, else null
+  sent           boolean not null default false, -- fulfillment: handled/sent?
   note           text not null default '',
   total          numeric not null default 0,
   created_at     timestamptz not null default now()
@@ -64,6 +66,7 @@ create or replace function create_transaction(
   p_payment       text,
   p_carrier       text,
   p_tracking_code text,
+  p_pickup_date   date,
   p_note          text,
   p_total         numeric,
   p_items         jsonb
@@ -75,8 +78,8 @@ declare
   v_item  jsonb;
   v_style uuid;
 begin
-  insert into transactions (date, type, buyer, channel, payment, carrier, tracking_code, note, total)
-  values (p_date, p_type, p_buyer, p_channel, p_payment, p_carrier, coalesce(p_tracking_code, ''), p_note, p_total)
+  insert into transactions (date, type, buyer, channel, payment, carrier, tracking_code, pickup_date, note, total)
+  values (p_date, p_type, p_buyer, p_channel, p_payment, p_carrier, coalesce(p_tracking_code, ''), p_pickup_date, p_note, p_total)
   returning id into v_tx_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
@@ -163,7 +166,7 @@ begin
          (u->>'qty')::int
   from jsonb_array_elements(payload->'stock') u;
 
-  insert into transactions (id, date, type, buyer, channel, payment, carrier, tracking_code, note, total, created_at)
+  insert into transactions (id, date, type, buyer, channel, payment, carrier, tracking_code, pickup_date, sent, note, total, created_at)
   select (t->>'id')::uuid,
          (t->>'date')::date,
          t->>'type',
@@ -172,6 +175,8 @@ begin
          nullif(t->>'payment', ''),
          nullif(t->>'carrier', ''),
          coalesce(t->>'trackingCode', ''),
+         nullif(t->>'pickupDate', '')::date,
+         coalesce((t->>'sent')::boolean, false),
          coalesce(t->>'note', ''),
          coalesce((t->>'total')::numeric, 0),
          coalesce((t->>'created_at')::timestamptz, now())

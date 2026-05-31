@@ -153,6 +153,8 @@ export class LocalStorageDB implements DraktlagerDB {
       payment: tx.type === 'gitt_bort' ? null : tx.payment,
       carrier: tx.carrier,
       trackingCode: tx.trackingCode.trim(),
+      pickupDate: tx.pickupDate,
+      sent: false,
       note: tx.note.trim(),
       total: computeTotal(tx),
       items: tx.items.map((it) => ({ ...it })),
@@ -188,6 +190,18 @@ export class LocalStorageDB implements DraktlagerDB {
     }
 
     data.transactions = data.transactions.filter((t) => t.id !== id)
+    this.write(data)
+  }
+
+  async updateOrder(
+    id: string,
+    patch: { pickupDate?: string | null; sent?: boolean },
+  ): Promise<void> {
+    const data = this.read()
+    const tx = data.transactions.find((t) => t.id === id)
+    if (!tx) return
+    if (patch.pickupDate !== undefined) tx.pickupDate = patch.pickupDate
+    if (patch.sent !== undefined) tx.sent = patch.sent
     this.write(data)
   }
 

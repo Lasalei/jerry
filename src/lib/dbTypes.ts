@@ -13,6 +13,8 @@ export interface NewTransaction {
   payment: Transaction['payment']
   carrier: Transaction['carrier']
   trackingCode: string
+  /** Helthjem pickup date (yyyy-mm-dd) or null. A new sale always starts unsent. */
+  pickupDate: string | null
   note: string
   items: TransactionItem[]
 }
@@ -35,6 +37,12 @@ export interface DraktlagerDB {
 
   /** Delete a transaction and restore the stock it consumed. */
   deleteTransaction(id: string): Promise<void>
+
+  /** Update fulfillment fields on an order (pickup date / sent flag). No stock change. */
+  updateOrder(
+    id: string,
+    patch: { pickupDate?: string | null; sent?: boolean },
+  ): Promise<void>
 
   /** Replace the entire dataset (used by JSON import). */
   importData(snapshot: DataSnapshot): Promise<void>

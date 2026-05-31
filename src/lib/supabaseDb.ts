@@ -45,6 +45,8 @@ interface TxRow {
   payment: string | null
   carrier: string | null
   tracking_code: string | null
+  pickup_date: string | null
+  sent: boolean | null
   note: string
   total: number
   created_at: string
@@ -96,6 +98,8 @@ export class SupabaseDB implements DraktlagerDB {
           payment: t.payment as Transaction['payment'],
           carrier: t.carrier as Transaction['carrier'],
           trackingCode: t.tracking_code ?? '',
+          pickupDate: t.pickup_date,
+          sent: t.sent ?? false,
           note: t.note,
           total: t.total,
           items: itemsByTx.get(t.id) ?? [],
@@ -184,6 +188,7 @@ export class SupabaseDB implements DraktlagerDB {
       p_payment: payment,
       p_carrier: tx.carrier,
       p_tracking_code: trackingCode,
+      p_pickup_date: tx.pickupDate,
       p_note: tx.note.trim(),
       p_total: total,
       p_items: items,
@@ -199,6 +204,8 @@ export class SupabaseDB implements DraktlagerDB {
       payment,
       carrier: tx.carrier,
       trackingCode,
+      pickupDate: tx.pickupDate,
+      sent: false,
       note: tx.note.trim(),
       total,
       items,
@@ -208,6 +215,18 @@ export class SupabaseDB implements DraktlagerDB {
 
   async deleteTransaction(id: string): Promise<void> {
     const { error } = await this.sb.rpc('delete_transaction', { p_tx_id: id })
+    if (error) throw error
+  }
+
+  async updateOrder(
+    id: string,
+    patch: { pickupDate?: string | null; sent?: boolean },
+  ): Promise<void> {
+    // No stock involved — a plain column update is enough (no RPC needed).
+    const row: { pickup_date?: string | null; sent?: boolean } = {}
+    if (patch.pickupDate !== undefined) row.pickup_date = patch.pickupDate
+    if (patch.sent !== undefined) row.sent = patch.sent
+    const { error } = await this.sb.from('transactions').update(row).eq('id', id)
     if (error) throw error
   }
 

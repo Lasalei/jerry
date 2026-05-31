@@ -57,6 +57,10 @@ export interface Transaction {
   carrier: Carrier | null
   /** Tracking / shipment code — free text. Empty if none. */
   trackingCode: string
+  /** Helthjem scheduled pickup date (yyyy-mm-dd); null for other carriers/none. */
+  pickupDate: string | null
+  /** Fulfillment flag: false = outstanding order, true = handled/sent. */
+  sent: boolean
   note: string
   /** Auto-summed price * qty across items (0 for gitt_bort). */
   total: number
