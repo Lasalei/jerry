@@ -12,6 +12,9 @@ export type Channel = 'Finn' | 'Direkte' | 'Annet'
 
 export type Payment = 'Vipps' | 'Kontant' | 'Bank' | 'Annet'
 
+/** Shipping carrier. null = no shipping (e.g. picked up in person). */
+export type Carrier = 'Posten' | 'PostNord' | 'Helthjem' | 'Annet'
+
 export type TxType = 'salg' | 'gitt_bort'
 
 /** A jersey style = one team/design, e.g. "Liverpool 24/25". */
@@ -50,6 +53,10 @@ export interface Transaction {
   channel: Channel
   /** Only meaningful for salg; null for gitt_bort. */
   payment: Payment | null
+  /** Shipping carrier, or null if not shipped (e.g. handed over in person). */
+  carrier: Carrier | null
+  /** Tracking / shipment code — free text. Empty if none. */
+  trackingCode: string
   note: string
   /** Auto-summed price * qty across items (0 for gitt_bort). */
   total: number

@@ -11,9 +11,10 @@ import {
   ScreenHeader,
   controlClass,
 } from '../components/ui'
-import { CHANNELS, PAYMENTS, SIZES, VARIANTS } from '../lib/constants'
+import { CARRIERS, CHANNELS, PAYMENTS, SIZES, VARIANTS } from '../lib/constants'
 import { formatKr, todayISO } from '../lib/format'
 import type {
+  Carrier,
   Channel,
   DraftItem,
   Payment,
@@ -22,6 +23,8 @@ import type {
   TxType,
   Variant,
 } from '../lib/types'
+
+const NO_SHIPPING = 'Ingen frakt'
 
 function emptyItem(): DraftItem {
   return { styleId: '', variant: '', size: '', qty: 1, price: 0 }
@@ -37,6 +40,9 @@ export function NyttSalg() {
   const [buyer, setBuyer] = useState('')
   const [channel, setChannel] = useState<Channel>('Finn')
   const [payment, setPayment] = useState<Payment>('Vipps')
+  // '' represents "Ingen frakt" (no shipping).
+  const [carrier, setCarrier] = useState<Carrier | ''>('')
+  const [trackingCode, setTrackingCode] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -84,6 +90,8 @@ export function NyttSalg() {
     setType('salg')
     setItems([emptyItem()])
     setBuyer('')
+    setCarrier('')
+    setTrackingCode('')
     setNote('')
     // keep channel + payment as-is for fast repeat logging
   }
@@ -109,6 +117,8 @@ export function NyttSalg() {
         buyer,
         channel,
         payment,
+        carrier: carrier || null,
+        trackingCode,
         note,
         items: txItems,
       })
@@ -325,6 +335,38 @@ export function NyttSalg() {
               </Field>
             )}
           </div>
+
+          {/* Shipping (frakt) */}
+          <div className="flex gap-3">
+            <Field label="Frakt" className="flex-1">
+              <NativeSelect
+                value={carrier}
+                onChange={(e) => setCarrier(e.target.value as Carrier | '')}
+              >
+                <option value="">{NO_SHIPPING}</option>
+                {CARRIERS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+            {carrier && (
+              <Field label="Sporingskode" className="flex-1">
+                <input
+                  type="text"
+                  value={trackingCode}
+                  onChange={(e) => setTrackingCode(e.target.value)}
+                  placeholder="f.eks. CC123…"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={`${controlClass} tnum`}
+                />
+              </Field>
+            )}
+          </div>
+
           <Field label="Notat">
             <textarea
               value={note}

@@ -23,15 +23,17 @@ create table if not exists stock (
 );
 
 create table if not exists transactions (
-  id          uuid primary key default gen_random_uuid(),
-  date        date not null,
-  type        text not null check (type in ('salg', 'gitt_bort')),
-  buyer       text not null default '',
-  channel     text not null,
-  payment     text,
-  note        text not null default '',
-  total       numeric not null default 0,
-  created_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  date           date not null,
+  type           text not null check (type in ('salg', 'gitt_bort')),
+  buyer          text not null default '',
+  channel        text not null,
+  payment        text,
+  carrier        text,                       -- shipping carrier, null = no shipping
+  tracking_code  text not null default '',   -- free-text shipment/tracking code
+  note           text not null default '',
+  total          numeric not null default 0,
+  created_at     timestamptz not null default now()
 );
 
 create table if not exists transaction_items (
@@ -55,14 +57,16 @@ create index if not exists tx_date_idx on transactions(date);
 -- ---------------------------------------------------------------------------
 
 create or replace function create_transaction(
-  p_date    date,
-  p_type    text,
-  p_buyer   text,
-  p_channel text,
-  p_payment text,
-  p_note    text,
-  p_total   numeric,
-  p_items   jsonb
+  p_date          date,
+  p_type          text,
+  p_buyer         text,
+  p_channel       text,
+  p_payment       text,
+  p_carrier       text,
+  p_tracking_code text,
+  p_note          text,
+  p_total         numeric,
+  p_items         jsonb
 ) returns uuid
 language plpgsql
 as $$
@@ -71,8 +75,8 @@ declare
   v_item  jsonb;
   v_style uuid;
 begin
-  insert into transactions (date, type, buyer, channel, payment, note, total)
-  values (p_date, p_type, p_buyer, p_channel, p_payment, p_note, p_total)
+  insert into transactions (date, type, buyer, channel, payment, carrier, tracking_code, note, total)
+  values (p_date, p_type, p_buyer, p_channel, p_payment, p_carrier, coalesce(p_tracking_code, ''), p_note, p_total)
   returning id into v_tx_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
@@ -159,13 +163,15 @@ begin
          (u->>'qty')::int
   from jsonb_array_elements(payload->'stock') u;
 
-  insert into transactions (id, date, type, buyer, channel, payment, note, total, created_at)
+  insert into transactions (id, date, type, buyer, channel, payment, carrier, tracking_code, note, total, created_at)
   select (t->>'id')::uuid,
          (t->>'date')::date,
          t->>'type',
          coalesce(t->>'buyer', ''),
          t->>'channel',
          nullif(t->>'payment', ''),
+         nullif(t->>'carrier', ''),
+         coalesce(t->>'trackingCode', ''),
          coalesce(t->>'note', ''),
          coalesce((t->>'total')::numeric, 0),
          coalesce((t->>'created_at')::timestamptz, now())

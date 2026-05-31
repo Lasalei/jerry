@@ -11,6 +11,8 @@ export interface NewTransaction {
   buyer: string
   channel: Transaction['channel']
   payment: Transaction['payment']
+  carrier: Transaction['carrier']
+  trackingCode: string
   note: string
   items: TransactionItem[]
 }

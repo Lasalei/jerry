@@ -43,6 +43,8 @@ interface TxRow {
   buyer: string
   channel: string
   payment: string | null
+  carrier: string | null
+  tracking_code: string | null
   note: string
   total: number
   created_at: string
@@ -92,6 +94,8 @@ export class SupabaseDB implements DraktlagerDB {
           buyer: t.buyer,
           channel: t.channel as Transaction['channel'],
           payment: t.payment as Transaction['payment'],
+          carrier: t.carrier as Transaction['carrier'],
+          trackingCode: t.tracking_code ?? '',
           note: t.note,
           total: t.total,
           items: itemsByTx.get(t.id) ?? [],
@@ -171,12 +175,15 @@ export class SupabaseDB implements DraktlagerDB {
       price: tx.type === 'gitt_bort' ? 0 : it.price,
     }))
 
+    const trackingCode = tx.trackingCode.trim()
     const { data: newId, error } = await this.sb.rpc('create_transaction', {
       p_date: tx.date,
       p_type: tx.type,
       p_buyer: tx.buyer.trim(),
       p_channel: tx.channel,
       p_payment: payment,
+      p_carrier: tx.carrier,
+      p_tracking_code: trackingCode,
       p_note: tx.note.trim(),
       p_total: total,
       p_items: items,
@@ -190,6 +197,8 @@ export class SupabaseDB implements DraktlagerDB {
       buyer: tx.buyer.trim(),
       channel: tx.channel,
       payment,
+      carrier: tx.carrier,
+      trackingCode,
       note: tx.note.trim(),
       total,
       items,

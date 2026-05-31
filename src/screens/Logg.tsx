@@ -100,6 +100,7 @@ export function Logg() {
                   </div>
                   <div className="mt-0.5 text-sm text-muted">
                     {formatDate(tx.date)} · {itemCount} stk · {tx.channel}
+                    {tx.carrier ? ` · ${tx.carrier}` : ''}
                   </div>
                 </div>
                 <span
@@ -136,9 +137,20 @@ export function Logg() {
                     ))}
                   </ul>
 
-                  {(tx.payment || tx.note) && (
+                  {(tx.payment || tx.carrier || tx.note) && (
                     <div className="mt-3 space-y-1 text-sm text-muted">
                       {tx.payment && <div>Betaling: {tx.payment}</div>}
+                      {tx.carrier && (
+                        <div>
+                          Frakt: {tx.carrier}
+                          {tx.trackingCode && (
+                            <>
+                              {' · '}
+                              <span className="tnum text-ink">{tx.trackingCode}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                       {tx.note && <div>Notat: {tx.note}</div>}
                     </div>
                   )}

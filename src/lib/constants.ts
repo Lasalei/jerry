@@ -1,4 +1,4 @@
-import type { Variant, Size, Channel, Payment } from './types'
+import type { Variant, Size, Channel, Payment, Carrier } from './types'
 
 export const VARIANTS: Variant[] = [
   'Hjemme – Fan',
@@ -12,6 +12,8 @@ export const SIZES: Size[] = ['S', 'M', 'L', 'XL', 'XXL', '3XL']
 export const CHANNELS: Channel[] = ['Finn', 'Direkte', 'Annet']
 
 export const PAYMENTS: Payment[] = ['Vipps', 'Kontant', 'Bank', 'Annet']
+
+export const CARRIERS: Carrier[] = ['Posten', 'PostNord', 'Helthjem', 'Annet']
 
 /** Shorter variant labels for tight UI spots (e.g. grid headers). */
 export const VARIANT_SHORT: Record<Variant, string> = {

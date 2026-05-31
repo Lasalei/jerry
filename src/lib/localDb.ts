@@ -151,6 +151,8 @@ export class LocalStorageDB implements DraktlagerDB {
       buyer: tx.buyer.trim(),
       channel: tx.channel,
       payment: tx.type === 'gitt_bort' ? null : tx.payment,
+      carrier: tx.carrier,
+      trackingCode: tx.trackingCode.trim(),
       note: tx.note.trim(),
       total: computeTotal(tx),
       items: tx.items.map((it) => ({ ...it })),
