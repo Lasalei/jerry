@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import { db, type NewTransaction } from './lib/db'
-import type { DataSnapshot, GridCell, Size, Variant } from './lib/types'
+import { DEFAULT_CONFIG } from './lib/constants'
+import type { AppConfig, DataSnapshot, GridCell, Size, Variant } from './lib/types'
 
 interface StoreValue {
   data: DataSnapshot
@@ -32,6 +33,7 @@ interface StoreValue {
     id: string,
     patch: { pickupDate?: string | null; sent?: boolean },
   ) => Promise<void>
+  saveConfig: (config: AppConfig) => Promise<void>
   importData: (snapshot: DataSnapshot) => Promise<void>
 }
 
@@ -39,6 +41,7 @@ const StoreContext = createContext<StoreValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DataSnapshot>({
+    config: DEFAULT_CONFIG,
     styles: [],
     stock: [],
     transactions: [],
@@ -115,6 +118,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await db.updateOrder(id, patch)
         await reload()
       },
+      saveConfig: async (config) => {
+        await db.saveConfig(config)
+        await reload()
+      },
       importData: async (snapshot) => {
         await db.importData(snapshot)
         await reload()
@@ -131,4 +138,10 @@ export function useStore(): StoreValue {
   const ctx = useContext(StoreContext)
   if (!ctx) throw new Error('useStore must be used within StoreProvider')
   return ctx
+}
+
+/** Convenience: the current workspace config (labels + product axes). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useConfig(): AppConfig {
+  return useStore().data.config
 }

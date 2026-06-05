@@ -11,7 +11,8 @@ import {
   ScreenHeader,
   controlClass,
 } from '../components/ui'
-import { CARRIERS, CHANNELS, PAYMENTS, SIZES, VARIANTS } from '../lib/constants'
+import { CARRIERS, CHANNELS, PAYMENTS } from '../lib/constants'
+import { useConfig } from '../store'
 import { formatKr, todayISO } from '../lib/format'
 import type {
   Carrier,
@@ -32,6 +33,8 @@ function emptyItem(): DraftItem {
 
 export function NyttSalg() {
   const { data, available, styleTotal, addTransaction } = useStore()
+  const config = useConfig()
+  const twoFields = config.field2 !== null
   const toast = useToast()
 
   const [date, setDate] = useState(todayISO())
@@ -63,14 +66,22 @@ export function NyttSalg() {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Available qty for a draft item (needs style + variant + size).
+  // The size value to persist/look up: '' for single-field workspaces.
+  function sizeOf(it: DraftItem): string {
+    return twoFields ? it.size : ''
+  }
+
+  // Available qty for a draft item (needs style + field1 [+ field2 when used]).
   function availFor(it: DraftItem): number | null {
-    if (!it.styleId || !it.variant || !it.size) return null
-    return available(it.styleId, it.variant as Variant, it.size as Size)
+    if (!it.styleId || !it.variant) return null
+    if (twoFields && !it.size) return null
+    return available(it.styleId, it.variant as Variant, sizeOf(it) as Size)
   }
 
   function itemComplete(it: DraftItem): boolean {
-    return Boolean(it.styleId && it.variant && it.size && it.qty > 0)
+    if (!it.styleId || !it.variant || it.qty <= 0) return false
+    if (twoFields && !it.size) return false
+    return true
   }
 
   function itemOverStock(it: DraftItem): boolean {
@@ -106,9 +117,9 @@ export function NyttSalg() {
         const style = data.styles.find((s) => s.id === it.styleId)
         return {
           styleId: it.styleId,
-          styleName: style?.name ?? '(slettet stil)',
+          styleName: style?.name ?? '(slettet)',
           variant: it.variant as Variant,
-          size: it.size as Size,
+          size: sizeOf(it) as Size,
           qty: it.qty,
           price: isGift ? 0 : it.price,
         }
@@ -205,7 +216,7 @@ export function NyttSalg() {
                 )}
               </div>
 
-              <Field label="Stil">
+              <Field label={config.productLabel}>
                 <StylePicker
                   styles={data.styles}
                   value={it.styleId}
@@ -215,7 +226,7 @@ export function NyttSalg() {
               </Field>
 
               <div className="flex gap-3">
-                <Field label="Variant" className="flex-1">
+                <Field label={config.field1.name} className="flex-1">
                   <NativeSelect
                     value={it.variant}
                     onChange={(e) =>
@@ -223,35 +234,45 @@ export function NyttSalg() {
                     }
                   >
                     <option value="">Velg…</option>
-                    {VARIANTS.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </Field>
-                <Field label="Størrelse" className="w-32">
-                  <NativeSelect
-                    value={it.size}
-                    onChange={(e) =>
-                      patchItem(index, { size: e.target.value as Size })
-                    }
-                  >
-                    <option value="">Velg…</option>
-                    {SIZES.map((s) => {
+                    {config.field1.values.map((v) => {
+                      // When single-field, show available qty right here.
                       const q =
-                        it.styleId && it.variant
-                          ? available(it.styleId, it.variant as Variant, s)
+                        !twoFields && it.styleId
+                          ? available(it.styleId, v as Variant, '' as Size)
                           : null
                       return (
-                        <option key={s} value={s}>
-                          {s}
+                        <option key={v} value={v}>
+                          {v}
                           {q !== null ? ` (${q})` : ''}
                         </option>
                       )
                     })}
                   </NativeSelect>
                 </Field>
+                {twoFields && (
+                  <Field label={config.field2!.name} className="w-32">
+                    <NativeSelect
+                      value={it.size}
+                      onChange={(e) =>
+                        patchItem(index, { size: e.target.value as Size })
+                      }
+                    >
+                      <option value="">Velg…</option>
+                      {config.field2!.values.map((s) => {
+                        const q =
+                          it.styleId && it.variant
+                            ? available(it.styleId, it.variant as Variant, s)
+                            : null
+                        return (
+                          <option key={s} value={s}>
+                            {s}
+                            {q !== null ? ` (${q})` : ''}
+                          </option>
+                        )
+                      })}
+                    </NativeSelect>
+                  </Field>
+                )}
               </div>
 
               <div className={`flex gap-3 ${isGift ? '' : 'items-end'}`}>

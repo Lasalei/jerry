@@ -182,8 +182,41 @@ sales and stock stay in sync live.
 Open the URL in Chrome → menu (⋮) → **"Install app" / "Legg til på startskjerm"**.
 Chrome usually also shows an automatic install prompt.
 
+## Configurable product fields (Innstillinger)
+
+The product model is configurable per workspace via **Mer → Innstillinger**:
+- **Product label** — what one product is called (e.g. "Stil" for jerseys,
+  "Produkt" for electronics).
+- **Field 1** (required) + **Field 2** (optional toggle) — each a name plus a list
+  of values. Jerseys use Variant × Størrelse; another seller might use just
+  "Kategori", or "Kategori × Tilstand".
+
+The whole app (sale form, stock grid, log, stats, CSV) follows the config. The
+default config reproduces the original jersey setup, so an existing workspace is
+unchanged. Removing a value that existing stock uses only *hides* it — the stock
+isn't deleted and reappears if you add the value back.
+
+## Lage en egen kopi for en annen selger (separate workspace)
+
+To let another person use the app for **their own products with their own data**
+— fully isolated from yours — give them a separate copy. Two databases, zero
+shared data.
+
+1. **New Supabase project:** they create a free project at supabase.com, then run
+   the entire [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor
+   (it now includes the `app_config` table + a default config row).
+2. **New Vercel project:** in Vercel, **Add New → Project → Import** the *same*
+   GitHub repo, but set that project's own env vars to the new Supabase
+   project's `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (and its own
+   `VITE_APP_PASSCODE`). Deploy → they get their own URL.
+3. **Configure fields:** they open **Mer → Innstillinger** and set their product
+   label + fields (e.g. Produkt / Kategori / Tilstand).
+
+Your existing project and data are never touched by any of this. Repeat per group.
+
 ## Phases
 
 - **Phase 1 — done:** local-only, all four screens working, localStorage behind `db.ts`.
 - **Phase 2 — done:** Supabase schema + client + realtime, localStorage offline fallback, optional passcode.
 - **Phase 3 — done:** installable PWA (offline viewing, home-screen icon, update prompt) + Vercel deploy config.
+- **Later additions:** shipping/Ordre page, per-product photos, **configurable product fields** + separate-copy support for other sellers.

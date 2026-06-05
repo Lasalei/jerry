@@ -1,8 +1,15 @@
 // localStorage backend. Used as the primary store when no Supabase env vars are
 // set, and as a read-only offline cache fallback when Supabase is configured.
 
-import type { DataSnapshot, GridCell, Style, StockUnit, Transaction } from './types'
-import { VARIANTS, SIZES } from './constants'
+import type {
+  AppConfig,
+  DataSnapshot,
+  GridCell,
+  Style,
+  StockUnit,
+  Transaction,
+} from './types'
+import { DEFAULT_CONFIG, field2Values } from './constants'
 import { computeTotal, type DraktlagerDB, type NewTransaction } from './dbTypes'
 
 const STORAGE_KEY = 'draktlager_v1'
@@ -19,15 +26,19 @@ function nowISO(): string {
 }
 
 function emptySnapshot(): DataSnapshot {
-  return { styles: [], stock: [], transactions: [] }
+  return { config: DEFAULT_CONFIG, styles: [], stock: [], transactions: [] }
 }
 
-/** Build the full 24-cell grid for a style, defaulting missing cells to 0. */
-function fullGridFor(styleId: string, cells: GridCell[]): StockUnit[] {
+/**
+ * Build the full grid for a style from the config's axis values, defaulting
+ * missing cells to 0. field1.values × field2Values(config) (the latter is `['']`
+ * for a single-field workspace).
+ */
+function fullGridFor(styleId: string, cells: GridCell[], config: AppConfig): StockUnit[] {
   const lookup = new Map(cells.map((c) => [`${c.variant}__${c.size}`, c.qty]))
   const units: StockUnit[] = []
-  for (const variant of VARIANTS) {
-    for (const size of SIZES) {
+  for (const variant of config.field1.values) {
+    for (const size of field2Values(config)) {
       units.push({
         id: uid(),
         style_id: styleId,
@@ -48,6 +59,7 @@ export function readLocalSnapshot(): DataSnapshot {
   try {
     const parsed = JSON.parse(raw) as Partial<DataSnapshot>
     return {
+      config: parsed.config ?? DEFAULT_CONFIG,
       styles: parsed.styles ?? [],
       stock: parsed.stock ?? [],
       transactions: parsed.transactions ?? [],
@@ -97,7 +109,7 @@ export class LocalStorageDB implements DraktlagerDB {
     const data = this.read()
     const style: Style = { id: uid(), name: name.trim(), imageUrl, created_at: nowISO() }
     data.styles.push(style)
-    data.stock.push(...fullGridFor(style.id, grid))
+    data.stock.push(...fullGridFor(style.id, grid, data.config))
     this.write(data)
     return style
   }
@@ -211,8 +223,15 @@ export class LocalStorageDB implements DraktlagerDB {
     this.write(data)
   }
 
+  async saveConfig(config: AppConfig): Promise<void> {
+    const data = this.read()
+    data.config = config
+    this.write(data)
+  }
+
   async importData(snapshot: DataSnapshot): Promise<void> {
     this.write({
+      config: snapshot.config ?? DEFAULT_CONFIG,
       styles: snapshot.styles ?? [],
       stock: snapshot.stock ?? [],
       transactions: snapshot.transactions ?? [],

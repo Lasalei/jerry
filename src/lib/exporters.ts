@@ -1,4 +1,5 @@
 import type { DataSnapshot } from './types'
+import { DEFAULT_CONFIG } from './constants'
 import { todayISO } from './format'
 
 /** Trigger a browser download of a Blob. */
@@ -34,15 +35,18 @@ function csvField(value: string | number): string {
  * parses columns directly. UTF-8 BOM keeps æ/ø/å intact in Excel.
  */
 export function exportSalesCSV(data: DataSnapshot) {
+  const { config } = data
+  const twoFields = config.field2 !== null
+
   const headers = [
     'Dato',
     'Type',
     'Kjøper',
     'Kanal',
     'Betaling',
-    'Stil',
-    'Variant',
-    'Størrelse',
+    config.productLabel,
+    config.field1.name,
+    ...(twoFields ? [config.field2!.name] : []),
     'Antall',
     'Pris',
     'Sum',
@@ -70,7 +74,7 @@ export function exportSalesCSV(data: DataSnapshot) {
           tx.payment ?? '',
           it.styleName,
           it.variant,
-          it.size,
+          ...(twoFields ? [it.size] : []),
           it.qty,
           tx.type === 'salg' ? it.price : 0,
           tx.type === 'salg' ? it.price * it.qty : 0,
@@ -105,6 +109,8 @@ export function parseImport(text: string): DataSnapshot {
     throw new Error('Ugyldig fil: mangler styles/stock/transactions')
   }
   return {
+    // Older backups predate config — fall back to the jersey default.
+    config: parsed.config ?? DEFAULT_CONFIG,
     styles: parsed.styles,
     stock: parsed.stock,
     transactions: parsed.transactions,

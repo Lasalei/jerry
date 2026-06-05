@@ -35,7 +35,8 @@ export function computeStats(data: DataSnapshot): Stats {
         totalRevenue += it.price * it.qty
       }
       variantCounts[it.variant] = (variantCounts[it.variant] ?? 0) + it.qty
-      sizeCounts[it.size] = (sizeCounts[it.size] ?? 0) + it.qty
+      // Skip the empty second axis used by single-field workspaces.
+      if (it.size) sizeCounts[it.size] = (sizeCounts[it.size] ?? 0) + it.qty
     }
   }
 

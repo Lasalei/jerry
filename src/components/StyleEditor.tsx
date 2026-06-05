@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { SIZES, VARIANTS } from '../lib/constants'
+import { field2Values } from '../lib/constants'
+import { useConfig } from '../store'
 import { fileToCompressedDataUrl } from '../lib/image'
 import type { GridCell, Style, StockUnit } from '../lib/types'
 
@@ -9,10 +10,10 @@ function key(variant: string, size: string) {
   return `${variant}__${size}`
 }
 
-function buildInitialGrid(stock: StockUnit[]): GridMap {
+function buildInitialGrid(stock: StockUnit[], v1: string[], v2: string[]): GridMap {
   const map: GridMap = {}
-  for (const variant of VARIANTS) {
-    for (const size of SIZES) {
+  for (const variant of v1) {
+    for (const size of v2) {
       const unit = stock.find((u) => u.variant === variant && u.size === size)
       map[key(variant, size)] = unit && unit.qty > 0 ? String(unit.qty) : ''
     }
@@ -21,7 +22,8 @@ function buildInitialGrid(stock: StockUnit[]): GridMap {
 }
 
 /**
- * Modal editor for creating or editing a style + its 4×6 stock grid.
+ * Modal editor for creating or editing a product + its stock.
+ * Two configured fields → a field1 × field2 grid; one field → a simple list.
  * `style` null => create mode.
  */
 export function StyleEditor({
@@ -35,8 +37,13 @@ export function StyleEditor({
   onSave: (name: string, grid: GridCell[], imageUrl: string | null) => Promise<void>
   onClose: () => void
 }) {
+  const config = useConfig()
+  const v1 = config.field1.values
+  const v2 = field2Values(config) // [''] when single-field
+  const twoFields = config.field2 !== null
+
   const [name, setName] = useState(style?.name ?? '')
-  const [grid, setGrid] = useState<GridMap>(() => buildInitialGrid(stock))
+  const [grid, setGrid] = useState<GridMap>(() => buildInitialGrid(stock, v1, v2))
   const [imageUrl, setImageUrl] = useState<string | null>(style?.imageUrl ?? null)
   const [imgBusy, setImgBusy] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -67,8 +74,8 @@ export function StyleEditor({
     if (!name.trim() || saving) return
     setSaving(true)
     const cells: GridCell[] = []
-    for (const variant of VARIANTS) {
-      for (const size of SIZES) {
+    for (const variant of v1) {
+      for (const size of v2) {
         cells.push({ variant, size, qty: Number(grid[key(variant, size)]) || 0 })
       }
     }
@@ -92,7 +99,7 @@ export function StyleEditor({
           Avbryt
         </button>
         <h2 className="font-display text-lg font-bold uppercase tracking-wide">
-          {style ? 'Rediger stil' : 'Ny stil'}
+          {style ? `Rediger ${config.productLabel.toLowerCase()}` : `Ny ${config.productLabel.toLowerCase()}`}
         </h2>
         <button
           type="button"
@@ -108,7 +115,7 @@ export function StyleEditor({
       <div className="flex-1 space-y-4 overflow-auto p-4">
         <div>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
-            Navn på stil
+            Navn på {config.productLabel.toLowerCase()}
           </span>
           <input
             type="text"
@@ -173,28 +180,50 @@ export function StyleEditor({
           )}
         </div>
 
-        {VARIANTS.map((variant) => (
-          <div key={variant} className="rounded-2xl border border-line bg-surface p-3">
-            <div className="mb-2 font-semibold text-ink">{variant}</div>
-            <div className="grid grid-cols-3 gap-2">
-              {SIZES.map((size) => (
-                <label key={size} className="flex flex-col">
-                  <span className="mb-1 text-[11px] font-semibold uppercase text-muted">
-                    {size}
-                  </span>
+        {/* Stock inputs: a field1×field2 grid, or a simple list when single-field */}
+        {twoFields ? (
+          v1.map((variant) => (
+            <div key={variant} className="rounded-2xl border border-line bg-surface p-3">
+              <div className="mb-2 font-semibold text-ink">{variant}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {v2.map((size) => (
+                  <label key={size} className="flex flex-col">
+                    <span className="mb-1 text-[11px] font-semibold uppercase text-muted">
+                      {size}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={grid[key(variant, size)]}
+                      placeholder="0"
+                      onChange={(e) => setCell(variant, size, e.target.value)}
+                      className="w-full rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-line bg-surface p-3">
+            <div className="mb-2 font-semibold text-ink">{config.field1.name}</div>
+            <div className="space-y-2">
+              {v1.map((variant) => (
+                <label key={variant} className="flex items-center justify-between gap-3">
+                  <span className="text-ink">{variant}</span>
                   <input
                     type="text"
                     inputMode="numeric"
-                    value={grid[key(variant, size)]}
+                    value={grid[key(variant, '')]}
                     placeholder="0"
-                    onChange={(e) => setCell(variant, size, e.target.value)}
-                    className="w-full rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
+                    onChange={(e) => setCell(variant, '', e.target.value)}
+                    className="w-24 rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
                   />
                 </label>
               ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Footer total */}

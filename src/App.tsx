@@ -9,9 +9,10 @@ import { Lager } from './screens/Lager'
 import { Ordre } from './screens/Ordre'
 import { Logg } from './screens/Logg'
 import { Mer } from './screens/Mer'
+import { Innstillinger } from './screens/Innstillinger'
 import { useStore } from './store'
 
-function Screen({ tab }: { tab: TabId }) {
+function Screen({ tab, onOpenSettings }: { tab: TabId; onOpenSettings: () => void }) {
   switch (tab) {
     case 'salg':
       return <NyttSalg />
@@ -22,12 +23,13 @@ function Screen({ tab }: { tab: TabId }) {
     case 'logg':
       return <Logg />
     case 'mer':
-      return <Mer />
+      return <Mer onOpenSettings={onOpenSettings} />
   }
 }
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('salg')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { loading, data } = useStore()
 
   // Outstanding orders = a shipping carrier set and not yet handled.
@@ -47,7 +49,7 @@ export default function App() {
                 Laster…
               </div>
             ) : (
-              <Screen tab={tab} />
+              <Screen tab={tab} onOpenSettings={() => setSettingsOpen(true)} />
             )}
           </main>
           <BottomNav
@@ -56,6 +58,7 @@ export default function App() {
             badges={{ ordre: outstandingOrders }}
           />
           <UpdatePrompt />
+          {settingsOpen && <Innstillinger onClose={() => setSettingsOpen(false)} />}
         </div>
       </ConfirmProvider>
       </ToastProvider>

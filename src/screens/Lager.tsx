@@ -4,7 +4,8 @@ import { useConfirm } from '../components/Confirm'
 import { useToast } from '../components/Toast'
 import { StyleEditor } from '../components/StyleEditor'
 import { Card, ScreenHeader, Stat, controlClass } from '../components/ui'
-import { SIZES, VARIANTS } from '../lib/constants'
+import { useConfig } from '../store'
+import { field2Values } from '../lib/constants'
 import type { GridCell, Size, Style, Variant } from '../lib/types'
 
 /** Colour code a stock cell: 0 = grey, ≤2 = amber, else normal. */
@@ -16,6 +17,10 @@ function cellClass(qty: number): string {
 
 export function Lager() {
   const { data, styleTotal, addStyle, updateStyle, deleteStyle } = useStore()
+  const config = useConfig()
+  const v1 = config.field1.values
+  const v2 = field2Values(config) // [''] when single-field
+  const twoFields = config.field2 !== null
   const confirm = useConfirm()
   const toast = useToast()
 
@@ -62,14 +67,14 @@ export function Lager() {
 
   async function handleDelete(style: Style) {
     const ok = await confirm({
-      title: 'Slette stil?',
+      title: `Slette ${config.productLabel.toLowerCase()}?`,
       message: `«${style.name}» og lagerbeholdningen slettes. Salgshistorikk beholdes.`,
       confirmLabel: 'Slett',
       danger: true,
     })
     if (ok) {
       await deleteStyle(style.id)
-      toast('Stil slettet')
+      toast('Slettet')
     }
   }
 
@@ -83,29 +88,29 @@ export function Lager() {
             onClick={() => setCreating(true)}
             className="rounded-xl bg-kit px-3 py-2 text-sm font-semibold text-white active:bg-kit-700"
           >
-            + Ny stil
+            + Ny {config.productLabel.toLowerCase()}
           </button>
         }
       />
 
       <div className="space-y-3 px-4">
         <Card className="flex gap-4 p-4">
-          <Stat value={totalJerseys} label="Drakter igjen" accent />
-          <Stat value={data.styles.length} label="Stiler" />
+          <Stat value={totalJerseys} label="På lager" accent />
+          <Stat value={data.styles.length} label={config.productLabel} />
         </Card>
 
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Søk etter stil…"
+          placeholder={`Søk etter ${config.productLabel.toLowerCase()}…`}
           className={controlClass}
         />
 
         {filtered.length === 0 && (
           <Card className="p-6 text-center text-sm text-muted">
             {data.styles.length === 0
-              ? 'Ingen stiler ennå. Trykk «+ Ny stil» for å starte.'
+              ? `Ingen ennå. Trykk «+ Ny ${config.productLabel.toLowerCase()}» for å starte.`
               : 'Ingen treff.'}
           </Card>
         )}
@@ -167,44 +172,62 @@ export function Lager() {
                       className="mb-3 max-h-56 w-full rounded-xl border border-line object-contain bg-canvas"
                     />
                   )}
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-center text-sm">
-                      <thead>
-                        <tr>
-                          <th className="p-1" />
-                          {SIZES.map((s) => (
-                            <th
-                              key={s}
-                              className="p-1 text-[11px] font-semibold uppercase text-muted"
-                            >
-                              {s}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {VARIANTS.map((v) => (
-                          <tr key={v}>
-                            <td className="whitespace-nowrap py-1 pr-2 text-left text-[11px] font-semibold text-muted">
-                              {v}
-                            </td>
-                            {SIZES.map((s) => {
-                              const q = qtyAt(style.id, v, s)
-                              return (
-                                <td key={s} className="p-0.5">
-                                  <div
-                                    className={`rounded-md py-1.5 tnum ${cellClass(q)}`}
-                                  >
-                                    {q}
-                                  </div>
-                                </td>
-                              )
-                            })}
+                  {twoFields ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-center text-sm">
+                        <thead>
+                          <tr>
+                            <th className="p-1" />
+                            {v2.map((s) => (
+                              <th
+                                key={s}
+                                className="p-1 text-[11px] font-semibold uppercase text-muted"
+                              >
+                                {s}
+                              </th>
+                            ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {v1.map((v) => (
+                            <tr key={v}>
+                              <td className="whitespace-nowrap py-1 pr-2 text-left text-[11px] font-semibold text-muted">
+                                {v}
+                              </td>
+                              {v2.map((s) => {
+                                const q = qtyAt(style.id, v, s)
+                                return (
+                                  <td key={s} className="p-0.5">
+                                    <div
+                                      className={`rounded-md py-1.5 tnum ${cellClass(q)}`}
+                                    >
+                                      {q}
+                                    </div>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {v1.map((v) => {
+                        const q = qtyAt(style.id, v, '')
+                        return (
+                          <div key={v} className="flex items-center justify-between gap-3">
+                            <span className="text-sm text-ink">{v}</span>
+                            <span
+                              className={`min-w-12 rounded-md px-3 py-1 text-center text-sm tnum ${cellClass(q)}`}
+                            >
+                              {q}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   <div className="mt-3 flex gap-3">
                     <button

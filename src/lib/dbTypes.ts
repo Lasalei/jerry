@@ -2,7 +2,14 @@
 // implement `DraktlagerDB`; the rest of the app only ever sees this interface
 // (via the `db` singleton exported from ./db).
 
-import type { DataSnapshot, GridCell, Style, Transaction, TransactionItem } from './types'
+import type {
+  AppConfig,
+  DataSnapshot,
+  GridCell,
+  Style,
+  Transaction,
+  TransactionItem,
+} from './types'
 
 /** Input to create a transaction. id/created_at/total are computed by the db. */
 export interface NewTransaction {
@@ -48,6 +55,9 @@ export interface DraktlagerDB {
     id: string,
     patch: { pickupDate?: string | null; sent?: boolean },
   ): Promise<void>
+
+  /** Save the workspace product config (label + 1–2 fields). */
+  saveConfig(config: AppConfig): Promise<void>
 
   /** Replace the entire dataset (used by JSON import). */
   importData(snapshot: DataSnapshot): Promise<void>

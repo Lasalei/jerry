@@ -1,13 +1,4 @@
-import type { Variant, Size, Channel, Payment, Carrier } from './types'
-
-export const VARIANTS: Variant[] = [
-  'Hjemme – Fan',
-  'Hjemme – Player',
-  'Borte – Fan',
-  'Borte – Player',
-]
-
-export const SIZES: Size[] = ['S', 'M', 'L', 'XL', 'XXL', '3XL']
+import type { AppConfig, Channel, Payment, Carrier } from './types'
 
 export const CHANNELS: Channel[] = ['Finn', 'Direkte', 'Annet']
 
@@ -15,10 +6,28 @@ export const PAYMENTS: Payment[] = ['Vipps', 'Kontant', 'Bank', 'Annet']
 
 export const CARRIERS: Carrier[] = ['Posten', 'PostNord', 'Helthjem', 'Annet']
 
-/** Shorter variant labels for tight UI spots (e.g. grid headers). */
-export const VARIANT_SHORT: Record<Variant, string> = {
-  'Hjemme – Fan': 'Hj · Fan',
-  'Hjemme – Player': 'Hj · Player',
-  'Borte – Fan': 'Bo · Fan',
-  'Borte – Player': 'Bo · Player',
+/**
+ * Default workspace config — reproduces the original jersey setup exactly, so a
+ * workspace with no saved config behaves identically to before. A new workspace
+ * (e.g. a friend reselling electronics) edits this via the Innstillinger screen.
+ */
+export const DEFAULT_CONFIG: AppConfig = {
+  productLabel: 'Stil',
+  field1: {
+    name: 'Variant',
+    values: ['Hjemme – Fan', 'Hjemme – Player', 'Borte – Fan', 'Borte – Player'],
+  },
+  field2: {
+    name: 'Størrelse',
+    values: ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  },
+}
+
+/**
+ * The field2 values for grid-building. A single-field workspace uses one synthetic
+ * column keyed by the empty string '' so the (style_id, variant, size) SKU shape
+ * is preserved.
+ */
+export function field2Values(config: AppConfig): string[] {
+  return config.field2 ? config.field2.values : ['']
 }

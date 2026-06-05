@@ -1,12 +1,28 @@
 // Domain model for Draktlager.
 
-export type Variant =
-  | 'Hjemme – Fan'
-  | 'Hjemme – Player'
-  | 'Borte – Fan'
-  | 'Borte – Player'
+// The two product axes are configurable per workspace (see AppConfig). They were
+// once jersey-specific unions ("Hjemme – Fan" / "S".."3XL"); now they are plain
+// strings whose allowed values come from the workspace config. field1 maps to the
+// `variant` column, field2 (optional) to the `size` column. A single-field
+// workspace leaves `size` as the empty string ''.
+export type Variant = string
+export type Size = string
 
-export type Size = 'S' | 'M' | 'L' | 'XL' | 'XXL' | '3XL'
+/** One configurable product axis: a display name + its allowed values. */
+export interface ProductField {
+  name: string
+  values: string[]
+}
+
+/** Per-workspace configuration of what a "product" is and its 1–2 axes. */
+export interface AppConfig {
+  /** What one product is called, e.g. "Stil" (jerseys) or "Produkt". */
+  productLabel: string
+  /** Always present; maps to the `variant` column. */
+  field1: ProductField
+  /** Optional second axis; maps to the `size` column. null = single-field. */
+  field2: ProductField | null
+}
 
 export type Channel = 'Finn' | 'Direkte' | 'Annet'
 
@@ -72,6 +88,7 @@ export interface Transaction {
 
 /** A full snapshot of all data — the unit of export/import + initial load. */
 export interface DataSnapshot {
+  config: AppConfig
   styles: Style[]
   stock: StockUnit[]
   transactions: Transaction[]

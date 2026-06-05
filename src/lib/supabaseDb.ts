@@ -11,6 +11,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
+  AppConfig,
   DataSnapshot,
   GridCell,
   Size,
@@ -20,17 +21,22 @@ import type {
   TransactionItem,
   Variant,
 } from './types'
-import { VARIANTS, SIZES } from './constants'
+import { DEFAULT_CONFIG, field2Values } from './constants'
 import { computeTotal, type DraktlagerDB, type NewTransaction } from './dbTypes'
 import { readLocalSnapshot, writeLocalSnapshot } from './localDb'
 
-const TABLES = ['styles', 'stock', 'transactions', 'transaction_items'] as const
+const TABLES = ['styles', 'stock', 'transactions', 'transaction_items', 'app_config'] as const
 
 interface StyleRow {
   id: string
   name: string
   image_url: string | null
   created_at: string
+}
+
+interface ConfigRow {
+  product_label: string
+  fields: { field1: AppConfig['field1']; field2: AppConfig['field2'] }
 }
 
 interface ItemRow {
@@ -68,15 +74,24 @@ export class SupabaseDB implements DraktlagerDB {
 
   async getAll(): Promise<DataSnapshot> {
     try {
-      const [styles, stock, txs, items] = await Promise.all([
+      const [styles, stock, txs, items, cfg] = await Promise.all([
         this.sb.from('styles').select('*'),
         this.sb.from('stock').select('*'),
         this.sb.from('transactions').select('*'),
         this.sb.from('transaction_items').select('*'),
+        this.sb.from('app_config').select('*').limit(1).maybeSingle(),
       ])
       for (const res of [styles, stock, txs, items]) {
         if (res.error) throw res.error
       }
+      // app_config may not exist yet (before migration 004) — fall back to default.
+      const config: AppConfig = cfg.data
+        ? {
+            productLabel: (cfg.data as ConfigRow).product_label,
+            field1: (cfg.data as ConfigRow).fields.field1,
+            field2: (cfg.data as ConfigRow).fields.field2,
+          }
+        : DEFAULT_CONFIG
 
       // Group items under their transaction.
       const itemsByTx = new Map<string, TransactionItem[]>()
@@ -94,6 +109,7 @@ export class SupabaseDB implements DraktlagerDB {
       }
 
       const snapshot: DataSnapshot = {
+        config,
         styles: ((styles.data ?? []) as StyleRow[]).map((s) => ({
           id: s.id,
           name: s.name,
@@ -139,10 +155,11 @@ export class SupabaseDB implements DraktlagerDB {
       .single()
     if (error) throw error
 
+    const config = await this.fetchConfig()
     const lookup = new Map(grid.map((c) => [`${c.variant}__${c.size}`, c.qty]))
     const rows: Array<Omit<StockUnit, 'id'>> = []
-    for (const variant of VARIANTS) {
-      for (const size of SIZES) {
+    for (const variant of config.field1.values) {
+      for (const size of field2Values(config)) {
         rows.push({
           style_id: style.id,
           variant,
@@ -248,6 +265,27 @@ export class SupabaseDB implements DraktlagerDB {
     if (error) throw error
   }
 
+  /** Read the config row, defaulting if the table/row is absent. */
+  private async fetchConfig(): Promise<AppConfig> {
+    const { data } = await this.sb.from('app_config').select('*').limit(1).maybeSingle()
+    if (!data) return DEFAULT_CONFIG
+    const row = data as ConfigRow
+    return { productLabel: row.product_label, field1: row.fields.field1, field2: row.fields.field2 }
+  }
+
+  async saveConfig(config: AppConfig): Promise<void> {
+    // Single-row table keyed by a fixed id ('singleton') — upsert it.
+    const { error } = await this.sb.from('app_config').upsert(
+      {
+        id: 'singleton',
+        product_label: config.productLabel,
+        fields: { field1: config.field1, field2: config.field2 },
+      },
+      { onConflict: 'id' },
+    )
+    if (error) throw error
+  }
+
   async importData(snapshot: DataSnapshot): Promise<void> {
     const { error } = await this.sb.rpc('import_data', {
       payload: {
@@ -257,6 +295,7 @@ export class SupabaseDB implements DraktlagerDB {
       },
     })
     if (error) throw error
+    if (snapshot.config) await this.saveConfig(snapshot.config)
     writeLocalSnapshot(snapshot)
   }
 

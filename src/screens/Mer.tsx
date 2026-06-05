@@ -49,8 +49,9 @@ function StatLine({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-export function Mer() {
+export function Mer({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { data, importData } = useStore()
+  const config = data.config
   const confirm = useConfirm()
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -101,11 +102,33 @@ export function Mer() {
             Statistikk
           </h2>
           <Card className="divide-y divide-line">
-            <StatLine label="Solgte drakter" value={stats.totalSold} />
+            <StatLine label="Solgte enheter" value={stats.totalSold} />
             <StatLine label="Total omsetning" value={formatKr(stats.totalRevenue)} />
-            <StatLine label="Mest solgte variant" value={stats.topVariant} />
-            <StatLine label="Mest solgte størrelse" value={stats.topSize} />
+            <StatLine
+              label={`Mest solgt ${config.field1.name.toLowerCase()}`}
+              value={stats.topVariant}
+            />
+            {config.field2 && (
+              <StatLine
+                label={`Mest solgt ${config.field2.name.toLowerCase()}`}
+                value={stats.topSize}
+              />
+            )}
             <StatLine label="Gitt bort" value={stats.giftCount} />
+          </Card>
+        </div>
+
+        {/* Settings */}
+        <div>
+          <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            Oppsett
+          </h2>
+          <Card>
+            <ActionRow
+              title="Innstillinger"
+              subtitle="Produktnavn og felter"
+              onClick={onOpenSettings}
+            />
           </Card>
         </div>
 

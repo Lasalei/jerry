@@ -125,7 +125,7 @@ export function Logg() {
                             {it.styleName}
                           </span>
                           <span className="block text-muted">
-                            {it.variant} · {it.size} · {it.qty} stk
+                            {[it.variant, it.size].filter(Boolean).join(' · ')} · {it.qty} stk
                           </span>
                         </span>
                         {!isGift && (

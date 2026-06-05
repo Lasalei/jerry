@@ -7,6 +7,14 @@
 -- Tables
 -- ---------------------------------------------------------------------------
 
+-- Per-workspace product configuration (single row). product_label + the 1–2
+-- configurable axes (field1 always, field2 optional) stored as jsonb.
+create table if not exists app_config (
+  id             text primary key default 'singleton',
+  product_label  text not null default 'Stil',
+  fields         jsonb not null
+);
+
 create table if not exists styles (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
@@ -203,6 +211,7 @@ $$;
 --  updates to reach both phones.)
 -- ---------------------------------------------------------------------------
 
+alter table app_config        enable row level security;
 alter table styles            enable row level security;
 alter table stock             enable row level security;
 alter table transactions      enable row level security;
@@ -211,7 +220,7 @@ alter table transaction_items enable row level security;
 do $$
 declare t text;
 begin
-  foreach t in array array['styles', 'stock', 'transactions', 'transaction_items']
+  foreach t in array array['app_config', 'styles', 'stock', 'transactions', 'transaction_items']
   loop
     execute format('drop policy if exists anon_all on %I', t);
     execute format(
@@ -222,10 +231,23 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Realtime — broadcast row changes on all four tables to subscribed clients.
+-- Realtime — broadcast row changes on all tables to subscribed clients.
 -- ---------------------------------------------------------------------------
 
+alter publication supabase_realtime add table app_config;
 alter publication supabase_realtime add table styles;
 alter publication supabase_realtime add table stock;
 alter publication supabase_realtime add table transactions;
 alter publication supabase_realtime add table transaction_items;
+
+-- ---------------------------------------------------------------------------
+-- Seed the default workspace config (jersey setup). Edit later in the app.
+-- ---------------------------------------------------------------------------
+
+insert into app_config (id, product_label, fields)
+values (
+  'singleton',
+  'Stil',
+  '{"field1":{"name":"Variant","values":["Hjemme – Fan","Hjemme – Player","Borte – Fan","Borte – Player"]},"field2":{"name":"Størrelse","values":["S","M","L","XL","XXL","3XL"]}}'::jsonb
+)
+on conflict (id) do nothing;
