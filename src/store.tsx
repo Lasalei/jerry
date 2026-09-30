@@ -9,7 +9,14 @@ import {
 } from 'react'
 import { db, type NewTransaction } from './lib/db'
 import { DEFAULT_CONFIG } from './lib/constants'
-import type { AppConfig, DataSnapshot, GridCell, Size, Variant } from './lib/types'
+import type {
+  AppConfig,
+  DataSnapshot,
+  GridCell,
+  Size,
+  StyleInput,
+  Variant,
+} from './lib/types'
 
 interface StoreValue {
   data: DataSnapshot
@@ -19,13 +26,8 @@ interface StoreValue {
   /** total remaining across all SKUs of a style. */
   styleTotal: (styleId: string) => number
   // actions
-  addStyle: (name: string, grid: GridCell[], imageUrl: string | null) => Promise<void>
-  updateStyle: (
-    id: string,
-    name: string,
-    grid: GridCell[],
-    imageUrl: string | null,
-  ) => Promise<void>
+  addStyle: (input: StyleInput, grid: GridCell[]) => Promise<void>
+  updateStyle: (id: string, input: StyleInput, grid: GridCell[]) => Promise<void>
   deleteStyle: (id: string) => Promise<void>
   addTransaction: (tx: NewTransaction) => Promise<void>
   deleteTransaction: (id: string) => Promise<void>
@@ -94,12 +96,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loading,
       available,
       styleTotal,
-      addStyle: async (name, grid, imageUrl) => {
-        await db.addStyle(name, grid, imageUrl)
+      addStyle: async (input, grid) => {
+        await db.addStyle(input, grid)
         await reload()
       },
-      updateStyle: async (id, name, grid, imageUrl) => {
-        await db.updateStyle(id, name, grid, imageUrl)
+      updateStyle: async (id, input, grid) => {
+        await db.updateStyle(id, input, grid)
         await reload()
       },
       deleteStyle: async (id) => {

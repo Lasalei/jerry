@@ -12,6 +12,7 @@ import {
   controlClass,
 } from '../components/ui'
 import { CARRIERS, CHANNELS, PAYMENTS } from '../lib/constants'
+import { axesFor, axisLabel } from '../lib/axes'
 import { useConfig } from '../store'
 import { formatKr, todayISO } from '../lib/format'
 import type {
@@ -69,6 +70,12 @@ export function NyttSalg() {
   // The size value to persist/look up: '' for single-field workspaces.
   function sizeOf(it: DraftItem): string {
     return twoFields ? it.size : ''
+  }
+
+  // The rows/columns of the picked product — each product has its own.
+  function axesOf(styleId: string) {
+    const style = data.styles.find((s) => s.id === styleId)
+    return style ? axesFor(style, data.stock, config) : null
   }
 
   // Available qty for a draft item (needs style + field1 [+ field2 when used]).
@@ -190,8 +197,8 @@ export function NyttSalg() {
 
         {!hasStyles && (
           <Card className="p-4 text-sm text-muted">
-            Du har ingen stiler ennå. Gå til <strong>Lager</strong> og legg til en
-            stil først.
+            Du har ingen {config.productLabel.toLowerCase()}er ennå. Gå til{' '}
+            <strong>Lager</strong> og legg til en først.
           </Card>
         )}
 
@@ -199,6 +206,7 @@ export function NyttSalg() {
         {items.map((it, index) => {
           const avail = availFor(it)
           const over = itemOverStock(it)
+          const axes = axesOf(it.styleId)
           return (
             <Card key={index} className="space-y-3 p-4">
               <div className="flex items-center justify-between">
@@ -221,7 +229,13 @@ export function NyttSalg() {
                   styles={data.styles}
                   value={it.styleId}
                   styleTotal={styleTotal}
-                  onChange={(id) => patchItem(index, { styleId: id })}
+                  placeholder={`Søk etter ${config.productLabel.toLowerCase()}…`}
+                  // A different product has different rows/columns — reset them.
+                  onChange={(id) =>
+                    id === it.styleId
+                      ? undefined
+                      : patchItem(index, { styleId: id, variant: '', size: '' })
+                  }
                 />
               </Field>
 
@@ -229,20 +243,22 @@ export function NyttSalg() {
                 <Field label={config.field1.name} className="flex-1">
                   <NativeSelect
                     value={it.variant}
+                    disabled={!axes}
                     onChange={(e) =>
                       patchItem(index, { variant: e.target.value as Variant })
                     }
                   >
-                    <option value="">Velg…</option>
-                    {config.field1.values.map((v) => {
+                    <option value="">
+                      {axes ? 'Velg…' : `Velg ${config.productLabel.toLowerCase()} først`}
+                    </option>
+                    {(axes?.v1 ?? []).map((v) => {
                       // When single-field, show available qty right here.
-                      const q =
-                        !twoFields && it.styleId
-                          ? available(it.styleId, v as Variant, '' as Size)
-                          : null
+                      const q = !twoFields
+                        ? available(it.styleId, v as Variant, '' as Size)
+                        : null
                       return (
                         <option key={v} value={v}>
-                          {v}
+                          {axisLabel(v)}
                           {q !== null ? ` (${q})` : ''}
                         </option>
                       )
@@ -253,19 +269,19 @@ export function NyttSalg() {
                   <Field label={config.field2!.name} className="w-32">
                     <NativeSelect
                       value={it.size}
+                      disabled={!axes}
                       onChange={(e) =>
                         patchItem(index, { size: e.target.value as Size })
                       }
                     >
                       <option value="">Velg…</option>
-                      {config.field2!.values.map((s) => {
-                        const q =
-                          it.styleId && it.variant
-                            ? available(it.styleId, it.variant as Variant, s)
-                            : null
+                      {(axes?.v2 ?? []).map((s) => {
+                        const q = it.variant
+                          ? available(it.styleId, it.variant as Variant, s)
+                          : null
                         return (
                           <option key={s} value={s}>
-                            {s}
+                            {axisLabel(s)}
                             {q !== null ? ` (${q})` : ''}
                           </option>
                         )

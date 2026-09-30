@@ -7,6 +7,7 @@ import type {
   DataSnapshot,
   GridCell,
   Style,
+  StyleInput,
   Transaction,
   TransactionItem,
 } from './types'
@@ -30,16 +31,17 @@ export interface DraktlagerDB {
   /** Load the full dataset (styles, stock, transactions). */
   getAll(): Promise<DataSnapshot>
 
-  /** Create a style and its stock grid (one SKU per variant × size). */
-  addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style>
+  /**
+   * Create a product with its own axes and stock grid. `grid` is the full set of
+   * cells (variants × sizes, zeros included) — the db writes exactly these SKUs.
+   */
+  addStyle(input: StyleInput, grid: GridCell[]): Promise<Style>
 
-  /** Rename a style, update its stock grid, and/or change its photo. */
-  updateStyle(
-    id: string,
-    name: string,
-    grid: GridCell[],
-    imageUrl: string | null,
-  ): Promise<void>
+  /**
+   * Update a product's name / photo / axes and replace its stock grid: cells in
+   * `grid` are upserted, SKUs no longer in the grid are deleted.
+   */
+  updateStyle(id: string, input: StyleInput, grid: GridCell[]): Promise<void>
 
   /** Delete a style and its stock. Transaction history is preserved (snapshot). */
   deleteStyle(id: string): Promise<void>

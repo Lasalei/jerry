@@ -16,12 +16,14 @@ import type {
   GridCell,
   Size,
   Style,
+  StyleInput,
   StockUnit,
   Transaction,
   TransactionItem,
   Variant,
 } from './types'
-import { DEFAULT_CONFIG, field2Values } from './constants'
+import { DEFAULT_CONFIG } from './constants'
+import { cellKey } from './axes'
 import { computeTotal, type DraktlagerDB, type NewTransaction } from './dbTypes'
 import { readLocalSnapshot, writeLocalSnapshot } from './localDb'
 
@@ -31,7 +33,26 @@ interface StyleRow {
   id: string
   name: string
   image_url: string | null
+  /** Per-product grid axes. null = saved before migration 005 (fall back to defaults). */
+  axes: { variants?: unknown; sizes?: unknown } | null
   created_at: string
+}
+
+function rowToStyle(s: StyleRow): Style {
+  const strs = (x: unknown): string[] =>
+    Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []
+  return {
+    id: s.id,
+    name: s.name,
+    imageUrl: s.image_url ?? null,
+    variants: strs(s.axes?.variants),
+    sizes: strs(s.axes?.sizes),
+    created_at: s.created_at,
+  }
+}
+
+function clampQty(qty: number): number {
+  return Math.max(0, Math.round(qty) || 0)
 }
 
 interface ConfigRow {
@@ -67,9 +88,23 @@ interface TxRow {
 
 export class SupabaseDB implements DraktlagerDB {
   private sb: SupabaseClient
+  /**
+   * Set once a write fails because styles.axes doesn't exist (migration 005 not
+   * run yet). Product writes then omit the column so the app keeps working the
+   * old way (workspace-wide values) instead of breaking until the migration runs.
+   */
+  private axesUnsupported = false
 
   constructor(sb: SupabaseClient) {
     this.sb = sb
+  }
+
+  /** The styles row payload, with axes unless the DB can't take them. */
+  private stylePayload(input: StyleInput) {
+    const base = { name: input.name.trim(), image_url: input.imageUrl }
+    return this.axesUnsupported
+      ? base
+      : { ...base, axes: { variants: input.variants, sizes: input.sizes } }
   }
 
   async getAll(): Promise<DataSnapshot> {
@@ -110,12 +145,7 @@ export class SupabaseDB implements DraktlagerDB {
 
       const snapshot: DataSnapshot = {
         config,
-        styles: ((styles.data ?? []) as StyleRow[]).map((s) => ({
-          id: s.id,
-          name: s.name,
-          imageUrl: s.image_url ?? null,
-          created_at: s.created_at,
-        })),
+        styles: ((styles.data ?? []) as StyleRow[]).map(rowToStyle),
         stock: (stock.data ?? []) as StockUnit[],
         transactions: ((txs.data ?? []) as TxRow[]).map((t) => ({
           id: t.id,
@@ -147,57 +177,67 @@ export class SupabaseDB implements DraktlagerDB {
     }
   }
 
-  async addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style> {
-    const { data: style, error } = await this.sb
-      .from('styles')
-      .insert({ name: name.trim(), image_url: imageUrl })
-      .select()
-      .single()
+  async addStyle(input: StyleInput, grid: GridCell[]): Promise<Style> {
+    let res = await this.sb.from('styles').insert(this.stylePayload(input)).select().single()
+    if (res.error && isMissingAxesColumn(res.error)) {
+      this.axesUnsupported = true
+      res = await this.sb.from('styles').insert(this.stylePayload(input)).select().single()
+    }
+    const { data: style, error } = res
     if (error) throw error
 
-    const config = await this.fetchConfig()
-    const lookup = new Map(grid.map((c) => [`${c.variant}__${c.size}`, c.qty]))
-    const rows: Array<Omit<StockUnit, 'id'>> = []
-    for (const variant of config.field1.values) {
-      for (const size of field2Values(config)) {
-        rows.push({
-          style_id: style.id,
-          variant,
-          size,
-          qty: Math.max(0, Math.round(lookup.get(`${variant}__${size}`) ?? 0)),
-        })
-      }
+    const rows = dedupeCells(grid).map((c) => ({
+      style_id: (style as StyleRow).id,
+      variant: c.variant,
+      size: c.size,
+      qty: clampQty(c.qty),
+    }))
+    if (rows.length > 0) {
+      const { error: stockErr } = await this.sb.from('stock').insert(rows)
+      if (stockErr) throw stockErr
     }
-    const { error: stockErr } = await this.sb.from('stock').insert(rows)
-    if (stockErr) throw stockErr
 
-    const s = style as StyleRow
-    return { id: s.id, name: s.name, imageUrl: s.image_url ?? null, created_at: s.created_at }
+    return rowToStyle(style as StyleRow)
   }
 
-  async updateStyle(
-    id: string,
-    name: string,
-    grid: GridCell[],
-    imageUrl: string | null,
-  ): Promise<void> {
-    const { error: nameErr } = await this.sb
-      .from('styles')
-      .update({ name: name.trim(), image_url: imageUrl })
-      .eq('id', id)
-    if (nameErr) throw nameErr
+  async updateStyle(id: string, input: StyleInput, grid: GridCell[]): Promise<void> {
+    let res = await this.sb.from('styles').update(this.stylePayload(input)).eq('id', id)
+    if (res.error && isMissingAxesColumn(res.error)) {
+      this.axesUnsupported = true
+      res = await this.sb.from('styles').update(this.stylePayload(input)).eq('id', id)
+    }
+    if (res.error) throw res.error
 
-    const rows = grid.map((c) => ({
+    const cells = dedupeCells(grid)
+    const rows = cells.map((c) => ({
       style_id: id,
       variant: c.variant,
       size: c.size,
-      qty: Math.max(0, Math.round(c.qty)),
+      qty: clampQty(c.qty),
     }))
     // Unique (style_id, variant, size) lets us upsert the whole grid in one call.
-    const { error } = await this.sb
+    if (rows.length > 0) {
+      const { error } = await this.sb
+        .from('stock')
+        .upsert(rows, { onConflict: 'style_id,variant,size' })
+      if (error) throw error
+    }
+
+    // Drop SKUs the product no longer has (a removed variant/size). Deleting by id
+    // avoids building PostgREST filter strings out of user-typed values.
+    const { data: existing, error: readErr } = await this.sb
       .from('stock')
-      .upsert(rows, { onConflict: 'style_id,variant,size' })
-    if (error) throw error
+      .select('id, variant, size')
+      .eq('style_id', id)
+    if (readErr) throw readErr
+    const keep = new Set(cells.map((c) => cellKey(c.variant, c.size)))
+    const stale = ((existing ?? []) as Array<{ id: string; variant: string; size: string }>)
+      .filter((r) => !keep.has(cellKey(r.variant, r.size)))
+      .map((r) => r.id)
+    if (stale.length > 0) {
+      const { error: delErr } = await this.sb.from('stock').delete().in('id', stale)
+      if (delErr) throw delErr
+    }
   }
 
   async deleteStyle(id: string): Promise<void> {
@@ -265,14 +305,6 @@ export class SupabaseDB implements DraktlagerDB {
     if (error) throw error
   }
 
-  /** Read the config row, defaulting if the table/row is absent. */
-  private async fetchConfig(): Promise<AppConfig> {
-    const { data } = await this.sb.from('app_config').select('*').limit(1).maybeSingle()
-    if (!data) return DEFAULT_CONFIG
-    const row = data as ConfigRow
-    return { productLabel: row.product_label, field1: row.fields.field1, field2: row.fields.field2 }
-  }
-
   async saveConfig(config: AppConfig): Promise<void> {
     // Single-row table keyed by a fixed id ('singleton') — upsert it.
     const { error } = await this.sb.from('app_config').upsert(
@@ -311,4 +343,19 @@ export class SupabaseDB implements DraktlagerDB {
       void this.sb.removeChannel(channel)
     }
   }
+}
+
+/** Collapse duplicate cells (same variant+size) to the last one. */
+function dedupeCells(grid: GridCell[]): GridCell[] {
+  const m = new Map<string, GridCell>()
+  for (const c of grid) m.set(cellKey(c.variant, c.size), c)
+  return [...m.values()]
+}
+
+/**
+ * PostgREST rejects an unknown column with PGRST204 ("Could not find the 'axes'
+ * column of 'styles' in the schema cache") — i.e. migration 005 hasn't run.
+ */
+function isMissingAxesColumn(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST204' && /axes/i.test(error.message ?? '')
 }

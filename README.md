@@ -50,10 +50,13 @@ src/
 
 ## Domain model
 
-- **Style** = one team/design (e.g. "Liverpool 24/25").
+- **Style** (product) = one team/design (e.g. "Liverpool 24/25"). Each product
+  carries its **own** grid axes (`variants` = rows, `sizes` = columns), editable
+  in the product editor; the workspace config only supplies the field names and
+  the default values a new product starts with.
 - **SKU** = style + variant + size → integer qty.
-  - variants: Hjemme – Fan, Hjemme – Player, Borte – Fan, Borte – Player
-  - sizes: S, M, L, XL, XXL, 3XL
+  - jersey defaults — variants: Hjemme – Fan, Hjemme – Player, Borte – Fan,
+    Borte – Player; sizes: S, M, L, XL, XXL, 3XL
 - **Transaction** = a sale (`salg`) or giveaway (`gitt_bort`). Saving decrements
   stock; deleting restores it. Each item snapshots `styleName` so history
   survives style deletion.
@@ -70,8 +73,14 @@ phones share one live dataset.
 ### 2. Create the schema
 1. In the dashboard go to **SQL Editor → New query**.
 2. Paste the entire contents of [`supabase/schema.sql`](supabase/schema.sql) and **Run**.
-   This creates the 4 tables, the atomic RPCs (`create_transaction`,
+   This creates the 5 tables, the atomic RPCs (`create_transaction`,
    `delete_transaction`, `import_data`), the RLS policies, and enables Realtime.
+
+> **Already have a database?** `schema.sql` is for a *fresh* project. An existing
+> database is upgraded by running the numbered files in
+> [`supabase/migrations/`](supabase/migrations/) that you haven't run yet, in
+> order (each is idempotent — running one twice is harmless). Run a migration
+> **before** deploying the app version that needs it.
 
 ### 3. Wire up the env vars
 1. Dashboard → **Project Settings → API**. Copy the **Project URL** and the
@@ -186,15 +195,37 @@ Chrome usually also shows an automatic install prompt.
 
 The product model is configurable per workspace via **Mer → Innstillinger**:
 - **Product label** — what one product is called (e.g. "Stil" for jerseys,
-  "Produkt" for electronics).
-- **Field 1** (required) + **Field 2** (optional toggle) — each a name plus a list
-  of values. Jerseys use Variant × Størrelse; another seller might use just
-  "Kategori", or "Kategori × Tilstand".
+  "Produkt" for clothes).
+- **Field 1** (required) + **Field 2** (optional toggle) — each a **name** plus a
+  list of **default values**. Jerseys use Variant × Størrelse; another seller
+  might use Farge × Størrelse, or just "Kategori".
 
 The whole app (sale form, stock grid, log, stats, CSV) follows the config. The
 default config reproduces the original jersey setup, so an existing workspace is
-unchanged. Removing a value that existing stock uses only *hides* it — the stock
-isn't deleted and reappears if you add the value back.
+unchanged.
+
+### Per-product values (since migration 005)
+
+The values in Innstillinger are only **defaults for new products**. Every product
+owns its own rows and columns, edited right in the product editor
+(**Lager → + Ny … / Rediger**): each field shows its values as chips with a
+**Legg til** box, so "Nike svart t-skjorte" can have XS, S, M, L, XL while
+"Nike Air Max" has 40–46, and a new colour can be added to one product without
+touching the others.
+
+- New values go to the end of the list, except that a list where *every* value
+  looks like a size (XS–6XL in any case, or numbers like 42 / 42,5) is kept in
+  size order automatically, so adding XS to S–XL puts it first.
+- Removing a value that still holds stock asks for confirmation; the stock under
+  it is deleted when you save.
+- Stock that exists under a value not in the product's list (e.g. restored by
+  deleting a sale) is shown anyway, so the grid always matches the total.
+- Changing the defaults in Innstillinger never touches existing products.
+  Switching Field 2 on/off does affect them (stock was saved with/without a
+  second value) and asks for confirmation.
+- Products created before migration 005 use the workspace defaults until they are
+  edited once. The migration backfills them with the current defaults, which is
+  exactly the grid they showed before.
 
 ## Lage en egen kopi for en annen selger (separate workspace)
 
@@ -219,4 +250,4 @@ Your existing project and data are never touched by any of this. Repeat per grou
 - **Phase 1 — done:** local-only, all four screens working, localStorage behind `db.ts`.
 - **Phase 2 — done:** Supabase schema + client + realtime, localStorage offline fallback, optional passcode.
 - **Phase 3 — done:** installable PWA (offline viewing, home-screen icon, update prompt) + Vercel deploy config.
-- **Later additions:** shipping/Ordre page, per-product photos, **configurable product fields** + separate-copy support for other sellers.
+- **Later additions:** shipping/Ordre page, per-product photos, **configurable product fields** + separate-copy support for other sellers, **per-product values** (each product owns its rows/columns; migration 005).

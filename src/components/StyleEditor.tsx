@@ -1,29 +1,42 @@
-import { useMemo, useRef, useState } from 'react'
-import { field2Values } from '../lib/constants'
+import { useRef, useState } from 'react'
+import { useConfirm } from './Confirm'
+import { ValueChips } from './ValueChips'
+import { axesFor, axisLabel, cellKey } from '../lib/axes'
 import { useConfig } from '../store'
 import { fileToCompressedDataUrl } from '../lib/image'
-import type { GridCell, Style, StockUnit } from '../lib/types'
+import type { AppConfig, GridCell, Style, StyleInput, StockUnit } from '../lib/types'
 
 type GridMap = Record<string, string>
 
-function key(variant: string, size: string) {
-  return `${variant}__${size}`
+/** Tailwind needs literal class names; index = column count - 1 (capped at 4). */
+const COLS_CLASS = ['grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4']
+
+function initialAxes(style: Style | null, stock: StockUnit[], config: AppConfig) {
+  if (style) return axesFor(style, stock, config)
+  // New product: start from the workspace defaults, then edit freely.
+  return {
+    v1: [...config.field1.values],
+    v2: config.field2 ? [...config.field2.values] : [''],
+  }
 }
 
-function buildInitialGrid(stock: StockUnit[], v1: string[], v2: string[]): GridMap {
+function initialGrid(style: Style | null, stock: StockUnit[]): GridMap {
   const map: GridMap = {}
-  for (const variant of v1) {
-    for (const size of v2) {
-      const unit = stock.find((u) => u.variant === variant && u.size === size)
-      map[key(variant, size)] = unit && unit.qty > 0 ? String(unit.qty) : ''
-    }
+  if (!style) return map
+  // Keep EVERY existing SKU (not just the visible axes) so a value that is
+  // removed and re-added before saving gets its quantity back.
+  for (const u of stock) {
+    if (u.style_id === style.id) map[cellKey(u.variant, u.size)] = u.qty > 0 ? String(u.qty) : ''
   }
   return map
 }
 
 /**
  * Modal editor for creating or editing a product + its stock.
- * Two configured fields → a field1 × field2 grid; one field → a simple list.
+ *
+ * The product owns its grid axes: the field1 values are its rows and the field2
+ * values its columns, both editable right here (add / remove). The workspace
+ * config only supplies the field names and the defaults a new product starts with.
  * `style` null => create mode.
  */
 export function StyleEditor({
@@ -34,20 +47,41 @@ export function StyleEditor({
 }: {
   style: Style | null
   stock: StockUnit[]
-  onSave: (name: string, grid: GridCell[], imageUrl: string | null) => Promise<void>
+  onSave: (input: StyleInput, grid: GridCell[]) => Promise<void>
   onClose: () => void
 }) {
   const config = useConfig()
-  const v1 = config.field1.values
-  const v2 = field2Values(config) // [''] when single-field
+  const confirm = useConfirm()
   const twoFields = config.field2 !== null
+  const label = config.productLabel.toLowerCase()
 
   const [name, setName] = useState(style?.name ?? '')
-  const [grid, setGrid] = useState<GridMap>(() => buildInitialGrid(stock, v1, v2))
+  const [variants, setVariants] = useState<string[]>(
+    () => initialAxes(style, stock, config).v1,
+  )
+  const [sizes, setSizes] = useState<string[]>(() =>
+    twoFields ? initialAxes(style, stock, config).v2 : [],
+  )
+  const [grid, setGrid] = useState<GridMap>(() => initialGrid(style, stock))
   const [imageUrl, setImageUrl] = useState<string | null>(style?.imageUrl ?? null)
   const [imgBusy, setImgBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Columns of the grid: the product's sizes, or one synthetic '' column.
+  const cols = twoFields ? sizes : ['']
+
+  function qtyAt(variant: string, size: string): number {
+    return Number(grid[cellKey(variant, size)]) || 0
+  }
+  function rowQty(variant: string): number {
+    return cols.reduce((sum, s) => sum + qtyAt(variant, s), 0)
+  }
+  function colQty(size: string): number {
+    return variants.reduce((sum, v) => sum + qtyAt(v, size), 0)
+  }
+
+  const total = variants.reduce((sum, v) => sum + rowQty(v), 0)
 
   async function handlePickImage(file: File) {
     setImgBusy(true)
@@ -60,51 +94,81 @@ export function StyleEditor({
     }
   }
 
-  const total = useMemo(
-    () => Object.values(grid).reduce((sum, v) => sum + (Number(v) || 0), 0),
-    [grid],
-  )
-
   function setCell(variant: string, size: string, value: string) {
     const clean = value.replace(/[^0-9]/g, '')
-    setGrid((prev) => ({ ...prev, [key(variant, size)]: clean }))
+    setGrid((prev) => ({ ...prev, [cellKey(variant, size)]: clean }))
   }
 
+  /** Veto removing a value that still holds stock unless the user confirms. */
+  async function confirmRemoval(
+    fieldName: string,
+    removed: string[],
+    qtyOf: (v: string) => number,
+  ): Promise<boolean> {
+    for (const v of removed) {
+      const q = qtyOf(v)
+      if (q === 0) continue
+      const ok = await confirm({
+        title: `Fjerne ${fieldName.toLowerCase()} «${axisLabel(v)}»?`,
+        message: `${q} stk på lager under denne verdien slettes når du lagrer.`,
+        confirmLabel: 'Fjern',
+        danger: true,
+      })
+      if (!ok) return false
+    }
+    return true
+  }
+
+  async function changeVariants(next: string[]) {
+    const removed = variants.filter((v) => !next.includes(v))
+    if (await confirmRemoval(config.field1.name, removed, rowQty)) setVariants(next)
+  }
+
+  async function changeSizes(next: string[]) {
+    const removed = sizes.filter((s) => !next.includes(s))
+    if (await confirmRemoval(config.field2?.name ?? '', removed, colQty)) setSizes(next)
+  }
+
+  const canSave =
+    name.trim() !== '' && variants.length > 0 && (!twoFields || sizes.length > 0) && !saving
+
   async function handleSave() {
-    if (!name.trim() || saving) return
+    if (!canSave) return
     setSaving(true)
     const cells: GridCell[] = []
-    for (const variant of v1) {
-      for (const size of v2) {
-        cells.push({ variant, size, qty: Number(grid[key(variant, size)]) || 0 })
+    for (const variant of variants) {
+      for (const size of cols) {
+        cells.push({ variant, size, qty: qtyAt(variant, size) })
       }
     }
     try {
-      await onSave(name.trim(), cells, imageUrl)
+      await onSave(
+        { name: name.trim(), imageUrl, variants, sizes: twoFields ? sizes : [] },
+        cells,
+      )
       onClose()
     } finally {
       setSaving(false)
     }
   }
 
+  const gridReady = variants.length > 0 && cols.length > 0
+  const colsClass = COLS_CLASS[Math.min(cols.length, COLS_CLASS.length) - 1]
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm font-semibold text-muted"
-        >
+        <button type="button" onClick={onClose} className="text-sm font-semibold text-muted">
           Avbryt
         </button>
         <h2 className="font-display text-lg font-bold uppercase tracking-wide">
-          {style ? `Rediger ${config.productLabel.toLowerCase()}` : `Ny ${config.productLabel.toLowerCase()}`}
+          {style ? `Rediger ${label}` : `Ny ${label}`}
         </h2>
         <button
           type="button"
           onClick={handleSave}
-          disabled={!name.trim() || saving}
+          disabled={!canSave}
           className="text-sm font-semibold text-kit disabled:opacity-40"
         >
           Lagre
@@ -115,13 +179,13 @@ export function StyleEditor({
       <div className="flex-1 space-y-4 overflow-auto p-4">
         <div>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
-            Navn på {config.productLabel.toLowerCase()}
+            Navn på {label}
           </span>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="f.eks. Liverpool 24/25"
+            placeholder="f.eks. Nike svart t-skjorte"
             autoFocus={!style}
             className="w-full rounded-xl border border-line bg-surface px-3 py-3 focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
           />
@@ -180,50 +244,99 @@ export function StyleEditor({
           )}
         </div>
 
+        {/* This product's own axes */}
+        <div className="rounded-2xl border border-line bg-surface p-3">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+            {config.field1.name}
+          </span>
+          <p className="mb-2 text-xs text-muted">
+            {twoFields ? 'Radene' : 'Linjene'} i lageret for dette produktet. Legg til så mange du
+            vil.
+          </p>
+          <ValueChips
+            values={variants}
+            onChange={(next) => void changeVariants(next)}
+            placeholder={`Ny ${config.field1.name.toLowerCase()}…`}
+            emptyText={`Legg til minst én ${config.field1.name.toLowerCase()}`}
+          />
+        </div>
+
+        {twoFields && (
+          <div className="rounded-2xl border border-line bg-surface p-3">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+              {config.field2!.name}
+            </span>
+            <p className="mb-2 text-xs text-muted">
+              Kolonnene i lageret for dette produktet, f.eks. XS, S, M, L, XL.
+            </p>
+            <ValueChips
+              values={sizes}
+              onChange={(next) => void changeSizes(next)}
+              placeholder={`Ny ${config.field2!.name.toLowerCase()}…`}
+              emptyText={`Legg til minst én ${config.field2!.name.toLowerCase()}`}
+            />
+          </div>
+        )}
+
         {/* Stock inputs: a field1×field2 grid, or a simple list when single-field */}
-        {twoFields ? (
-          v1.map((variant) => (
-            <div key={variant} className="rounded-2xl border border-line bg-surface p-3">
-              <div className="mb-2 font-semibold text-ink">{variant}</div>
-              <div className="grid grid-cols-3 gap-2">
-                {v2.map((size) => (
-                  <label key={size} className="flex flex-col">
-                    <span className="mb-1 text-[11px] font-semibold uppercase text-muted">
-                      {size}
-                    </span>
+        <div>
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
+            Antall på lager
+          </span>
+          {!gridReady ? (
+            <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">
+              Legg til {config.field1.name.toLowerCase()}
+              {twoFields ? ` og ${config.field2!.name.toLowerCase()}` : ''} over for å fylle inn
+              antall.
+            </div>
+          ) : twoFields ? (
+            <div className="space-y-3">
+              {variants.map((variant) => (
+                <div key={variant} className="rounded-2xl border border-line bg-surface p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="font-semibold text-ink">{axisLabel(variant)}</span>
+                    <span className="text-xs tnum text-muted">{rowQty(variant)} stk</span>
+                  </div>
+                  <div className={`grid ${colsClass} gap-2`}>
+                    {cols.map((size) => (
+                      <label key={size} className="flex flex-col">
+                        <span className="mb-1 truncate text-center text-[11px] font-semibold uppercase text-muted">
+                          {axisLabel(size)}
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={grid[cellKey(variant, size)] ?? ''}
+                          placeholder="0"
+                          onChange={(e) => setCell(variant, size, e.target.value)}
+                          className="w-full rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-line bg-surface p-3">
+              <div className="space-y-2">
+                {variants.map((variant) => (
+                  <label key={variant} className="flex items-center justify-between gap-3">
+                    <span className="text-ink">{axisLabel(variant)}</span>
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={grid[key(variant, size)]}
+                      value={grid[cellKey(variant, '')] ?? ''}
                       placeholder="0"
-                      onChange={(e) => setCell(variant, size, e.target.value)}
-                      className="w-full rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
+                      onChange={(e) => setCell(variant, '', e.target.value)}
+                      className="w-24 rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
                     />
                   </label>
                 ))}
               </div>
             </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-line bg-surface p-3">
-            <div className="mb-2 font-semibold text-ink">{config.field1.name}</div>
-            <div className="space-y-2">
-              {v1.map((variant) => (
-                <label key={variant} className="flex items-center justify-between gap-3">
-                  <span className="text-ink">{variant}</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={grid[key(variant, '')]}
-                    placeholder="0"
-                    onChange={(e) => setCell(variant, '', e.target.value)}
-                    className="w-24 rounded-lg border border-line bg-surface px-2 py-2 text-center tnum focus:border-kit focus:outline-none focus:ring-2 focus:ring-kit-100"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Footer total */}

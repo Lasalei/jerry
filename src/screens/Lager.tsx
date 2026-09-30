@@ -5,8 +5,8 @@ import { useToast } from '../components/Toast'
 import { StyleEditor } from '../components/StyleEditor'
 import { Card, ScreenHeader, Stat, controlClass } from '../components/ui'
 import { useConfig } from '../store'
-import { field2Values } from '../lib/constants'
-import type { GridCell, Size, Style, Variant } from '../lib/types'
+import { axesFor, axisLabel } from '../lib/axes'
+import type { GridCell, Size, Style, StyleInput, Variant } from '../lib/types'
 
 /** Colour code a stock cell: 0 = grey, ≤2 = amber, else normal. */
 function cellClass(qty: number): string {
@@ -18,9 +18,8 @@ function cellClass(qty: number): string {
 export function Lager() {
   const { data, styleTotal, addStyle, updateStyle, deleteStyle } = useStore()
   const config = useConfig()
-  const v1 = config.field1.values
-  const v2 = field2Values(config) // [''] when single-field
   const twoFields = config.field2 !== null
+  const label = config.productLabel
   const confirm = useConfirm()
   const toast = useToast()
 
@@ -54,15 +53,15 @@ export function Lager() {
     )
   }
 
-  async function handleSaveNew(name: string, grid: GridCell[], imageUrl: string | null) {
-    await addStyle(name, grid, imageUrl)
-    toast('Stil lagt til')
+  async function handleSaveNew(input: StyleInput, grid: GridCell[]) {
+    await addStyle(input, grid)
+    toast(`${label} lagt til`)
   }
 
-  async function handleSaveEdit(name: string, grid: GridCell[], imageUrl: string | null) {
+  async function handleSaveEdit(input: StyleInput, grid: GridCell[]) {
     if (!editing) return
-    await updateStyle(editing.id, name, grid, imageUrl)
-    toast('Stil oppdatert')
+    await updateStyle(editing.id, input, grid)
+    toast(`${label} oppdatert`)
   }
 
   async function handleDelete(style: Style) {
@@ -118,6 +117,8 @@ export function Lager() {
         {filtered.map((style) => {
           const total = styleTotal(style.id)
           const isOpen = expanded === style.id
+          // Each product has its own rows/columns.
+          const { v1, v2 } = isOpen ? axesFor(style, data.stock, config) : { v1: [], v2: [] }
           return (
             <Card key={style.id} className="overflow-hidden">
               <button
@@ -183,7 +184,7 @@ export function Lager() {
                                 key={s}
                                 className="p-1 text-[11px] font-semibold uppercase text-muted"
                               >
-                                {s}
+                                {axisLabel(s)}
                               </th>
                             ))}
                           </tr>
@@ -192,7 +193,7 @@ export function Lager() {
                           {v1.map((v) => (
                             <tr key={v}>
                               <td className="whitespace-nowrap py-1 pr-2 text-left text-[11px] font-semibold text-muted">
-                                {v}
+                                {axisLabel(v)}
                               </td>
                               {v2.map((s) => {
                                 const q = qtyAt(style.id, v, s)
@@ -217,7 +218,7 @@ export function Lager() {
                         const q = qtyAt(style.id, v, '')
                         return (
                           <div key={v} className="flex items-center justify-between gap-3">
-                            <span className="text-sm text-ink">{v}</span>
+                            <span className="text-sm text-ink">{axisLabel(v)}</span>
                             <span
                               className={`min-w-12 rounded-md px-3 py-1 text-center text-sm tnum ${cellClass(q)}`}
                             >

@@ -8,7 +8,11 @@
 export type Variant = string
 export type Size = string
 
-/** One configurable product axis: a display name + its allowed values. */
+/**
+ * One configurable product axis: a display name + its DEFAULT values. The values
+ * pre-fill a new product's grid; each product then keeps its own list (Style.variants
+ * / Style.sizes) and can add or remove values freely.
+ */
 export interface ProductField {
   name: string
   values: string[]
@@ -33,13 +37,32 @@ export type Carrier = 'Posten' | 'PostNord' | 'Helthjem' | 'Annet'
 
 export type TxType = 'salg' | 'gitt_bort'
 
-/** A jersey style = one team/design, e.g. "Liverpool 24/25". */
+/** A product (jersey style = one team/design, e.g. "Liverpool 24/25"). */
 export interface Style {
   id: string
   name: string
   /** Optional photo as a downscaled data URL (base64 JPEG). null = no photo. */
   imageUrl: string | null
+  /**
+   * This product's own field1 values (grid rows), in display order. Each product
+   * picks its own — "Nike t-skjorte" can have Svart/Hvit while another has Grå.
+   * Empty = not set yet (pre-005 data): falls back to the workspace defaults.
+   */
+  variants: string[]
+  /**
+   * This product's own field2 values (grid columns), in display order. Empty in a
+   * single-field workspace, or = not set yet (falls back to workspace defaults).
+   */
+  sizes: string[]
   created_at: string
+}
+
+/** Everything needed to create or update a product (stock grid passed separately). */
+export interface StyleInput {
+  name: string
+  imageUrl: string | null
+  variants: string[]
+  sizes: string[]
 }
 
 /** One SKU = style + variant + size, holding an integer quantity. */

@@ -8,7 +8,9 @@
 -- ---------------------------------------------------------------------------
 
 -- Per-workspace product configuration (single row). product_label + the 1–2
--- configurable axes (field1 always, field2 optional) stored as jsonb.
+-- configurable axes (field1 always, field2 optional) stored as jsonb. The values
+-- listed per field are DEFAULTS for new products; each product keeps its own
+-- list in styles.axes.
 create table if not exists app_config (
   id             text primary key default 'singleton',
   product_label  text not null default 'Stil',
@@ -19,6 +21,10 @@ create table if not exists styles (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   image_url   text,                          -- optional photo as a data URL
+  -- This product's own grid axes: {"variants":[...],"sizes":[...]} (ordered).
+  -- The app_config values are only defaults for NEW products. null = legacy
+  -- product saved before migration 005 → the app falls back to the defaults.
+  axes        jsonb,
   created_at  timestamptz not null default now()
 );
 
@@ -161,10 +167,14 @@ begin
   delete from transactions; -- items cascade
   delete from styles;       -- stock cascades
 
-  insert into styles (id, name, image_url, created_at)
+  insert into styles (id, name, image_url, axes, created_at)
   select (s->>'id')::uuid,
          s->>'name',
          nullif(s->>'imageUrl', ''),
+         jsonb_build_object(
+           'variants', coalesce(s->'variants', '[]'::jsonb),
+           'sizes',    coalesce(s->'sizes',    '[]'::jsonb)
+         ),
          coalesce((s->>'created_at')::timestamptz, now())
   from jsonb_array_elements(payload->'styles') s;
 

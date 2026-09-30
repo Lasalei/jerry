@@ -6,10 +6,12 @@ import type {
   DataSnapshot,
   GridCell,
   Style,
+  StyleInput,
   StockUnit,
   Transaction,
 } from './types'
-import { DEFAULT_CONFIG, field2Values } from './constants'
+import { DEFAULT_CONFIG } from './constants'
+import { cellKey, normalizeStyle } from './axes'
 import { computeTotal, type DraktlagerDB, type NewTransaction } from './dbTypes'
 
 const STORAGE_KEY = 'draktlager_v1'
@@ -25,30 +27,12 @@ function nowISO(): string {
   return new Date().toISOString()
 }
 
-function emptySnapshot(): DataSnapshot {
-  return { config: DEFAULT_CONFIG, styles: [], stock: [], transactions: [] }
+function clampQty(qty: number): number {
+  return Math.max(0, Math.round(qty) || 0)
 }
 
-/**
- * Build the full grid for a style from the config's axis values, defaulting
- * missing cells to 0. field1.values × field2Values(config) (the latter is `['']`
- * for a single-field workspace).
- */
-function fullGridFor(styleId: string, cells: GridCell[], config: AppConfig): StockUnit[] {
-  const lookup = new Map(cells.map((c) => [`${c.variant}__${c.size}`, c.qty]))
-  const units: StockUnit[] = []
-  for (const variant of config.field1.values) {
-    for (const size of field2Values(config)) {
-      units.push({
-        id: uid(),
-        style_id: styleId,
-        variant,
-        size,
-        qty: Math.max(0, Math.round(lookup.get(`${variant}__${size}`) ?? 0)),
-      })
-    }
-  }
-  return units
+function emptySnapshot(): DataSnapshot {
+  return { config: DEFAULT_CONFIG, styles: [], stock: [], transactions: [] }
 }
 
 /** Low-level read of the cached snapshot — also used by the Supabase fallback. */
@@ -60,7 +44,7 @@ export function readLocalSnapshot(): DataSnapshot {
     const parsed = JSON.parse(raw) as Partial<DataSnapshot>
     return {
       config: parsed.config ?? DEFAULT_CONFIG,
-      styles: parsed.styles ?? [],
+      styles: (parsed.styles ?? []).map(normalizeStyle),
       stock: parsed.stock ?? [],
       transactions: parsed.transactions ?? [],
     }
@@ -105,40 +89,41 @@ export class LocalStorageDB implements DraktlagerDB {
     return this.read()
   }
 
-  async addStyle(name: string, grid: GridCell[], imageUrl: string | null): Promise<Style> {
+  async addStyle(input: StyleInput, grid: GridCell[]): Promise<Style> {
     const data = this.read()
-    const style: Style = { id: uid(), name: name.trim(), imageUrl, created_at: nowISO() }
+    const style: Style = {
+      id: uid(),
+      name: input.name.trim(),
+      imageUrl: input.imageUrl,
+      variants: [...input.variants],
+      sizes: [...input.sizes],
+      created_at: nowISO(),
+    }
     data.styles.push(style)
-    data.stock.push(...fullGridFor(style.id, grid, data.config))
+    data.stock.push(...unitsFor(style.id, grid, new Map()))
     this.write(data)
     return style
   }
 
-  async updateStyle(
-    id: string,
-    name: string,
-    grid: GridCell[],
-    imageUrl: string | null,
-  ): Promise<void> {
+  async updateStyle(id: string, input: StyleInput, grid: GridCell[]): Promise<void> {
     const data = this.read()
     const style = data.styles.find((s) => s.id === id)
-    if (!style) throw new Error('Fant ikke stilen')
-    style.name = name.trim()
-    style.imageUrl = imageUrl
+    if (!style) throw new Error('Fant ikke produktet')
+    style.name = input.name.trim()
+    style.imageUrl = input.imageUrl
+    style.variants = [...input.variants]
+    style.sizes = [...input.sizes]
 
-    const desired = new Map(grid.map((c) => [`${c.variant}__${c.size}`, c.qty]))
-    for (const unit of data.stock) {
-      if (unit.style_id !== id) continue
-      const key = `${unit.variant}__${unit.size}`
-      if (desired.has(key)) {
-        unit.qty = Math.max(0, Math.round(desired.get(key)!))
-        desired.delete(key)
-      }
+    // Replace this product's SKUs with exactly the grid: existing rows keep their
+    // id, missing rows are created, rows no longer in the grid are dropped.
+    const existing = new Map<string, StockUnit>()
+    for (const u of data.stock) {
+      if (u.style_id === id) existing.set(cellKey(u.variant, u.size), u)
     }
-    for (const [key, qty] of desired) {
-      const [variant, size] = key.split('__') as [StockUnit['variant'], StockUnit['size']]
-      data.stock.push({ id: uid(), style_id: id, variant, size, qty: Math.max(0, Math.round(qty)) })
-    }
+    data.stock = [
+      ...data.stock.filter((u) => u.style_id !== id),
+      ...unitsFor(id, grid, existing),
+    ]
     this.write(data)
   }
 
@@ -232,7 +217,7 @@ export class LocalStorageDB implements DraktlagerDB {
   async importData(snapshot: DataSnapshot): Promise<void> {
     this.write({
       config: snapshot.config ?? DEFAULT_CONFIG,
-      styles: snapshot.styles ?? [],
+      styles: (snapshot.styles ?? []).map(normalizeStyle),
       stock: snapshot.stock ?? [],
       transactions: snapshot.transactions ?? [],
     })
@@ -244,4 +229,29 @@ export class LocalStorageDB implements DraktlagerDB {
       this.listeners.delete(listener)
     }
   }
+}
+
+/**
+ * Turn grid cells into SKU rows for a product. Reuses the id of an existing row
+ * for the same cell (so nothing else referencing it breaks); duplicates in the
+ * grid collapse to the last one.
+ */
+function unitsFor(
+  styleId: string,
+  grid: GridCell[],
+  existing: Map<string, StockUnit>,
+): StockUnit[] {
+  const out = new Map<string, StockUnit>()
+  for (const c of grid) {
+    const k = cellKey(c.variant, c.size)
+    const prev = existing.get(k)
+    out.set(k, {
+      id: prev?.id ?? uid(),
+      style_id: styleId,
+      variant: c.variant,
+      size: c.size,
+      qty: clampQty(c.qty),
+    })
+  }
+  return [...out.values()]
 }

@@ -9,7 +9,8 @@ export const CARRIERS: Carrier[] = ['Posten', 'PostNord', 'Helthjem', 'Annet']
 /**
  * Default workspace config — reproduces the original jersey setup exactly, so a
  * workspace with no saved config behaves identically to before. A new workspace
- * (e.g. a friend reselling electronics) edits this via the Innstillinger screen.
+ * (e.g. a friend reselling clothes) edits this via the Innstillinger screen. The
+ * values here are only DEFAULTS for new products; each product keeps its own list.
  */
 export const DEFAULT_CONFIG: AppConfig = {
   productLabel: 'Stil',
@@ -21,13 +22,4 @@ export const DEFAULT_CONFIG: AppConfig = {
     name: 'Størrelse',
     values: ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   },
-}
-
-/**
- * The field2 values for grid-building. A single-field workspace uses one synthetic
- * column keyed by the empty string '' so the (style_id, variant, size) SKU shape
- * is preserved.
- */
-export function field2Values(config: AppConfig): string[] {
-  return config.field2 ? config.field2.values : ['']
 }

@@ -1,5 +1,6 @@
 import type { DataSnapshot } from './types'
 import { DEFAULT_CONFIG } from './constants'
+import { normalizeStyle } from './axes'
 import { todayISO } from './format'
 
 /** Trigger a browser download of a Blob. */
@@ -111,7 +112,8 @@ export function parseImport(text: string): DataSnapshot {
   return {
     // Older backups predate config — fall back to the jersey default.
     config: parsed.config ?? DEFAULT_CONFIG,
-    styles: parsed.styles,
+    // Older backups predate per-product axes — normalizeStyle fills them in.
+    styles: parsed.styles.map(normalizeStyle),
     stock: parsed.stock,
     transactions: parsed.transactions,
   }
