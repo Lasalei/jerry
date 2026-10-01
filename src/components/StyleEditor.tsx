@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useConfirm } from './Confirm'
 import { ValueChips } from './ValueChips'
-import { axesFor, axisLabel, cellKey } from '../lib/axes'
+import { axesFor, axisLabel, cellKey, hasSecondAxis } from '../lib/axes'
 import { useConfig } from '../store'
 import { fileToCompressedDataUrl } from '../lib/image'
 import type { AppConfig, GridCell, Style, StyleInput, StockUnit } from '../lib/types'
@@ -59,9 +59,16 @@ export function StyleEditor({
   const [variants, setVariants] = useState<string[]>(
     () => initialAxes(style, stock, config).v1,
   )
-  const [sizes, setSizes] = useState<string[]>(() =>
-    twoFields ? initialAxes(style, stock, config).v2 : [],
+  // Per product: does it use the second field at all? (Electronics: no sizes.)
+  const [useSizes, setUseSizes] = useState<boolean>(() =>
+    twoFields && (style ? hasSecondAxis(initialAxes(style, stock, config)) : true),
   )
+  const [sizes, setSizes] = useState<string[]>(() => {
+    if (!twoFields) return []
+    const axes = initialAxes(style, stock, config)
+    // A product without sizes starts from the defaults if sizes get switched on.
+    return hasSecondAxis(axes) ? axes.v2 : [...config.field2!.values]
+  })
   const [grid, setGrid] = useState<GridMap>(() => initialGrid(style, stock))
   const [imageUrl, setImageUrl] = useState<string | null>(style?.imageUrl ?? null)
   const [imgBusy, setImgBusy] = useState(false)
@@ -69,7 +76,9 @@ export function StyleEditor({
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Columns of the grid: the product's sizes, or one synthetic '' column.
-  const cols = twoFields ? sizes : ['']
+  const grid2D = twoFields && useSizes
+  const cols = grid2D ? sizes : ['']
+  const field2Lower = (config.field2?.name ?? '').toLowerCase()
 
   function qtyAt(variant: string, size: string): number {
     return Number(grid[cellKey(variant, size)]) || 0
@@ -129,8 +138,54 @@ export function StyleEditor({
     if (await confirmRemoval(config.field2?.name ?? '', removed, colQty)) setSizes(next)
   }
 
+  /** Quantity a row holds in real size cells (ignoring the '' no-size cell). */
+  function sizeSum(variant: string): number {
+    return sizes.filter((s) => s !== '').reduce((sum, s) => sum + qtyAt(variant, s), 0)
+  }
+
+  /** Switch the second field on/off for this product. */
+  async function toggleSizes() {
+    if (useSizes) {
+      // Off: fold each row's per-size quantities into its single '' cell — nothing
+      // lost. The size cells stay in `grid` so switching back on is a clean undo.
+      const merged: GridMap = { ...grid }
+      for (const v of variants) {
+        const sum = cols.includes('') ? rowQty(v) : rowQty(v) + qtyAt(v, '')
+        merged[cellKey(v, '')] = sum > 0 ? String(sum) : ''
+      }
+      setGrid(merged)
+      setUseSizes(false)
+      return
+    }
+    if (!sizes.includes('')) {
+      // On: a '' cell that only mirrors quantities already in size cells (folded
+      // earlier in this session) is dropped silently. Only quantities with no size
+      // cells behind them (a product saved without sizes) are really at risk.
+      const loose = variants.reduce(
+        (sum, v) => sum + (sizeSum(v) === 0 ? qtyAt(v, '') : 0),
+        0,
+      )
+      if (loose > 0) {
+        const ok = await confirm({
+          title: `Slå på ${field2Lower}?`,
+          message: `${loose} stk er registrert uten ${field2Lower} og fjernes når du lagrer. Fyll inn antall per ${field2Lower} etterpå.`,
+          confirmLabel: 'Slå på',
+          danger: true,
+        })
+        if (!ok) return
+      }
+      const cleared: GridMap = { ...grid }
+      for (const v of variants) cleared[cellKey(v, '')] = ''
+      setGrid(cleared)
+    }
+    setUseSizes(true)
+  }
+
   const canSave =
-    name.trim() !== '' && variants.length > 0 && (!twoFields || sizes.length > 0) && !saving
+    name.trim() !== '' &&
+    variants.length > 0 &&
+    (!grid2D || sizes.length > 0) &&
+    !saving
 
   async function handleSave() {
     if (!canSave) return
@@ -143,7 +198,7 @@ export function StyleEditor({
     }
     try {
       await onSave(
-        { name: name.trim(), imageUrl, variants, sizes: twoFields ? sizes : [] },
+        { name: name.trim(), imageUrl, variants, sizes: grid2D ? sizes : [] },
         cells,
       )
       onClose()
@@ -250,7 +305,7 @@ export function StyleEditor({
             {config.field1.name}
           </span>
           <p className="mb-2 text-xs text-muted">
-            {twoFields ? 'Radene' : 'Linjene'} i lageret for dette produktet. Legg til så mange du
+            {grid2D ? 'Radene' : 'Linjene'} i lageret for dette produktet. Legg til så mange du
             vil.
           </p>
           <ValueChips
@@ -263,18 +318,45 @@ export function StyleEditor({
 
         {twoFields && (
           <div className="rounded-2xl border border-line bg-surface p-3">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
-              {config.field2!.name}
-            </span>
-            <p className="mb-2 text-xs text-muted">
-              Kolonnene i lageret for dette produktet, f.eks. XS, S, M, L, XL.
-            </p>
-            <ValueChips
-              values={sizes}
-              onChange={(next) => void changeSizes(next)}
-              placeholder={`Ny ${config.field2!.name.toLowerCase()}…`}
-              emptyText={`Legg til minst én ${config.field2!.name.toLowerCase()}`}
-            />
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                {config.field2!.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => void toggleSizes()}
+                aria-pressed={useSizes}
+                aria-label={`Bruker ${config.field2!.name}`}
+                className={`relative h-6 w-11 rounded-full transition-colors ${
+                  useSizes ? 'bg-kit' : 'bg-line'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
+                    useSizes ? 'left-[22px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+            {useSizes ? (
+              <>
+                <p className="mb-2 text-xs text-muted">
+                  Kolonnene i lageret for dette produktet, f.eks. XS, S, M, L, XL.
+                </p>
+                <ValueChips
+                  values={sizes}
+                  onChange={(next) => void changeSizes(next)}
+                  placeholder={`Ny ${field2Lower}…`}
+                  emptyText={`Legg til minst én ${field2Lower}`}
+                />
+              </>
+            ) : (
+              <p className="text-xs text-muted">
+                Ingen {field2Lower} for dette produktet. Antall telles per{' '}
+                {config.field1.name.toLowerCase()}. Passer for f.eks. elektronikk og
+                diverse.
+              </p>
+            )}
           </div>
         )}
 
@@ -286,10 +368,9 @@ export function StyleEditor({
           {!gridReady ? (
             <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">
               Legg til {config.field1.name.toLowerCase()}
-              {twoFields ? ` og ${config.field2!.name.toLowerCase()}` : ''} over for å fylle inn
-              antall.
+              {grid2D ? ` og ${field2Lower}` : ''} over for å fylle inn antall.
             </div>
-          ) : twoFields ? (
+          ) : grid2D ? (
             <div className="space-y-3">
               {variants.map((variant) => (
                 <div key={variant} className="rounded-2xl border border-line bg-surface p-3">

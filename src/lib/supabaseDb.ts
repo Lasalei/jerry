@@ -46,7 +46,8 @@ function rowToStyle(s: StyleRow): Style {
     name: s.name,
     imageUrl: s.image_url ?? null,
     variants: strs(s.axes?.variants),
-    sizes: strs(s.axes?.sizes),
+    // null (not an array) = legacy row without axes → defaults; [] = no second field.
+    sizes: Array.isArray(s.axes?.sizes) ? strs(s.axes.sizes) : null,
     created_at: s.created_at,
   }
 }

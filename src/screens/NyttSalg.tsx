@@ -12,7 +12,7 @@ import {
   controlClass,
 } from '../components/ui'
 import { CARRIERS, CHANNELS, PAYMENTS } from '../lib/constants'
-import { axesFor, axisLabel } from '../lib/axes'
+import { axesFor, axisLabel, hasSecondAxis } from '../lib/axes'
 import { useConfig } from '../store'
 import { formatKr, todayISO } from '../lib/format'
 import type {
@@ -67,9 +67,16 @@ export function NyttSalg() {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // The size value to persist/look up: '' for single-field workspaces.
+  // Does this item's product use the second field? (Unknown product → assume yes.)
+  function needsSize(it: DraftItem): boolean {
+    if (!twoFields) return false
+    const a = axesOf(it.styleId)
+    return a ? hasSecondAxis(a) : true
+  }
+
+  // The size value to persist/look up: '' when the product has no second field.
   function sizeOf(it: DraftItem): string {
-    return twoFields ? it.size : ''
+    return needsSize(it) ? it.size : ''
   }
 
   // The rows/columns of the picked product — each product has its own.
@@ -81,13 +88,13 @@ export function NyttSalg() {
   // Available qty for a draft item (needs style + field1 [+ field2 when used]).
   function availFor(it: DraftItem): number | null {
     if (!it.styleId || !it.variant) return null
-    if (twoFields && !it.size) return null
+    if (needsSize(it) && !it.size) return null
     return available(it.styleId, it.variant as Variant, sizeOf(it) as Size)
   }
 
   function itemComplete(it: DraftItem): boolean {
     if (!it.styleId || !it.variant || it.qty <= 0) return false
-    if (twoFields && !it.size) return false
+    if (needsSize(it) && !it.size) return false
     return true
   }
 
@@ -252,10 +259,11 @@ export function NyttSalg() {
                       {axes ? 'Velg…' : `Velg ${config.productLabel.toLowerCase()} først`}
                     </option>
                     {(axes?.v1 ?? []).map((v) => {
-                      // When single-field, show available qty right here.
-                      const q = !twoFields
-                        ? available(it.styleId, v as Variant, '' as Size)
-                        : null
+                      // No second field for this product → show available qty right here.
+                      const q =
+                        axes && !hasSecondAxis(axes)
+                          ? available(it.styleId, v as Variant, '' as Size)
+                          : null
                       return (
                         <option key={v} value={v}>
                           {axisLabel(v)}
@@ -265,7 +273,7 @@ export function NyttSalg() {
                     })}
                   </NativeSelect>
                 </Field>
-                {twoFields && (
+                {twoFields && (!axes || hasSecondAxis(axes)) && (
                   <Field label={config.field2!.name} className="w-32">
                     <NativeSelect
                       value={it.size}

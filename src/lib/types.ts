@@ -50,10 +50,14 @@ export interface Style {
    */
   variants: string[]
   /**
-   * This product's own field2 values (grid columns), in display order. Empty in a
-   * single-field workspace, or = not set yet (falls back to workspace defaults).
+   * This product's own field2 values (grid columns), in display order.
+   * - `null`  = not set yet (pre-005 data): falls back to the workspace defaults.
+   * - `[]`    = this product does NOT use the second field (e.g. electronics have
+   *             no sizes): quantities are per variant only.
+   * - `[...]` = its own list.
+   * Ignored (treated as none) in a single-field workspace.
    */
-  sizes: string[]
+  sizes: string[] | null
   created_at: string
 }
 
@@ -62,6 +66,7 @@ export interface StyleInput {
   name: string
   imageUrl: string | null
   variants: string[]
+  /** [] = this product has no second field. */
   sizes: string[]
 }
 

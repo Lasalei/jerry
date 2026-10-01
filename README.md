@@ -224,6 +224,10 @@ touching the others.
 - New values go to the end of the list, except that a list where *every* value
   looks like a size (XS–6XL in any case, or numbers like 42 / 42,5) is kept in
   size order automatically, so adding XS to S–XL puts it first.
+- A product can switch the second field **off** (toggle in the editor) — for
+  electronics or anything without sizes. Its quantities are then per variant
+  only; switching off folds the per-size quantities into one cell so nothing is
+  lost. Mixed inventories (clothes + electronics + misc) work in one workspace.
 - Removing a value that still holds stock asks for confirmation; the stock under
   it is deleted when you save.
 - Stock that exists under a value not in the product's list (e.g. restored by

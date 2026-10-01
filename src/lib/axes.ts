@@ -24,7 +24,8 @@ export function cellKey(variant: string, size: string): string {
  * The grid axes for one product.
  *
  * - Own values if set; otherwise the workspace defaults (pre-005 products).
- * - Single-field workspace → one synthetic column keyed by ''.
+ * - Single-field workspace, or a product that has switched the second field off
+ *   (sizes = []) → one synthetic column keyed by ''.
  * - Any stock this product still holds under a value that isn't listed is appended,
  *   so the visible grid always accounts for the product's total.
  */
@@ -36,9 +37,11 @@ export function axesFor(
   const v1 = style.variants.length > 0 ? [...style.variants] : [...config.field1.values]
   const v2 = !config.field2
     ? ['']
-    : style.sizes.length > 0
-      ? [...style.sizes]
-      : [...config.field2.values]
+    : style.sizes === null
+      ? [...config.field2.values] // legacy: not set yet
+      : style.sizes.length === 0
+        ? [''] // this product has no second field
+        : [...style.sizes]
 
   for (const u of stock) {
     if (u.style_id !== style.id || u.qty <= 0) continue
@@ -55,13 +58,18 @@ export function normalizeStyle(raw: Partial<Style> & Pick<Style, 'id' | 'name'>)
     name: raw.name,
     imageUrl: raw.imageUrl ?? null,
     variants: Array.isArray(raw.variants) ? raw.variants.filter(isStr) : [],
-    sizes: Array.isArray(raw.sizes) ? raw.sizes.filter(isStr) : [],
+    sizes: Array.isArray(raw.sizes) ? raw.sizes.filter(isStr) : null,
     created_at: raw.created_at ?? new Date().toISOString(),
   }
 }
 
 function isStr(x: unknown): x is string {
   return typeof x === 'string'
+}
+
+/** True when the grid really has a second dimension (not just the '' column). */
+export function hasSecondAxis(axes: Axes): boolean {
+  return !(axes.v2.length === 1 && axes.v2[0] === '')
 }
 
 /** Header label for a grid column — '' (no second field) renders as a dash. */

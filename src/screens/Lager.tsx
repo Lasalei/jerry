@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast'
 import { StyleEditor } from '../components/StyleEditor'
 import { Card, ScreenHeader, Stat, controlClass } from '../components/ui'
 import { useConfig } from '../store'
-import { axesFor, axisLabel } from '../lib/axes'
+import { axesFor, axisLabel, hasSecondAxis } from '../lib/axes'
 import type { GridCell, Size, Style, StyleInput, Variant } from '../lib/types'
 
 /** Colour code a stock cell: 0 = grey, ≤2 = amber, else normal. */
@@ -173,7 +173,7 @@ export function Lager() {
                       className="mb-3 max-h-56 w-full rounded-xl border border-line object-contain bg-canvas"
                     />
                   )}
-                  {twoFields ? (
+                  {twoFields && hasSecondAxis({ v1, v2 }) ? (
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse text-center text-sm">
                         <thead>
