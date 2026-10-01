@@ -98,9 +98,13 @@ export function Innstillinger({ onClose }: { onClose: () => void }) {
             type="text"
             value={productLabel}
             onChange={(e) => setProductLabel(e.target.value)}
-            placeholder="f.eks. Stil, Produkt, Vare"
+            placeholder="f.eks. Produkt eller Vare"
             className={controlClass}
           />
+          <p className="mt-1 text-xs text-muted">
+            Ett kort ord. Det settes inn i tekster som «+ Ny {productLabel.trim().toLowerCase() || '…'}»
+            og «Navn på {productLabel.trim().toLowerCase() || '…'}».
+          </p>
         </div>
 
         {/* Field 1 */}

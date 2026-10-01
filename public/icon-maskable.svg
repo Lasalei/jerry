@@ -1,36 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Maskable variant: glyph kept inside the 80% safe zone -->
   <rect width="512" height="512" fill="#0B8457"/>
-  <!-- Same kit, scaled to ~64% so it stays inside the maskable safe zone -->
-  <g transform="translate(256 248) scale(0.62) translate(-256 -248)">
-    <path d="M256 116
-             c-25 0 -45 13 -57 21
-             l-82 31
-             a20 20 0 0 0 -13 19
-             l5 74
-             a15 15 0 0 0 17 14
-             l33 -5
-             v116
-             a22 22 0 0 0 22 22
-             h150
-             a22 22 0 0 0 22 -22
-             v-116
-             l33 5
-             a15 15 0 0 0 17 -14
-             l5 -74
-             a20 20 0 0 0 -13 -19
-             l-82 -31
-             c-12 -8 -32 -21 -57 -21
-             z"
-          fill="#ffffff"/>
-    <path d="M222 137
-             a36 36 0 0 0 68 0
-             c-10 -7 -22 -13 -34 -13
-             c-12 0 -24 6 -34 13
-             z"
-          fill="#0B8457"/>
-    <path d="M104 187 l33 -12 6 40 -34 5 z" fill="#0B8457" opacity="0.9"/>
-    <path d="M408 187 l-33 -12 -6 40 34 5 z" fill="#0B8457" opacity="0.9"/>
-    <text x="256" y="378" font-family="Oswald, 'Arial Narrow', sans-serif" font-weight="700"
-          font-size="122" fill="#0B8457" text-anchor="middle">10</text>
-  </g>
+  <g transform="translate(256 256) scale(13) translate(-12 -12)"><g fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/><path d="M7.5 4.27l9 5.15"/></g></g>
 </svg>

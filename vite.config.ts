@@ -1,13 +1,25 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { APP_NAME, APP_DESCRIPTION } from './src/lib/constants'
+
+/** Fills %APP_NAME% / %APP_DESCRIPTION% in index.html from the app constants. */
+function appNameHtml(): Plugin {
+  return {
+    name: 'app-name-html',
+    transformIndexHtml(html) {
+      return html.replaceAll('%APP_NAME%', APP_NAME).replaceAll('%APP_DESCRIPTION%', APP_DESCRIPTION)
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    appNameHtml(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: [
@@ -17,9 +29,9 @@ export default defineConfig({
         'icon.svg',
       ],
       manifest: {
-        name: 'Draktlager',
-        short_name: 'Draktlager',
-        description: 'Lager og salg av fotballdrakter',
+        name: APP_NAME,
+        short_name: APP_NAME,
+        description: APP_DESCRIPTION,
         lang: 'nb',
         start_url: '/',
         scope: '/',

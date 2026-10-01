@@ -1,4 +1,4 @@
--- Draktlager — Supabase schema (Phase 2)
+-- Varelager (formerly Draktlager) — Supabase schema
 -- Run this once in the Supabase SQL editor (Dashboard → SQL → New query).
 -- Single shared workspace, no per-user auth. The anon key is public, so this
 -- grants the anon role full access; optionally gate the app with VITE_APP_PASSCODE.
@@ -251,13 +251,14 @@ alter publication supabase_realtime add table transactions;
 alter publication supabase_realtime add table transaction_items;
 
 -- ---------------------------------------------------------------------------
--- Seed the default workspace config (jersey setup). Edit later in the app.
+-- Seed a generic default workspace config (matches DEFAULT_CONFIG in the app).
+-- Edit later under Mer → Innstillinger.
 -- ---------------------------------------------------------------------------
 
 insert into app_config (id, product_label, fields)
 values (
   'singleton',
-  'Stil',
-  '{"field1":{"name":"Variant","values":["Hjemme – Fan","Hjemme – Player","Borte – Fan","Borte – Player"]},"field2":{"name":"Størrelse","values":["S","M","L","XL","XXL","3XL"]}}'::jsonb
+  'Produkt',
+  '{"field1":{"name":"Variant","values":["Standard"]},"field2":{"name":"Størrelse","values":["XS","S","M","L","XL","XXL"]}}'::jsonb
 )
 on conflict (id) do nothing;

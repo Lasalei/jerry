@@ -1,4 +1,9 @@
-# Draktlager
+# Varelager
+
+> Formerly **Draktlager**. The app, its icon and its texts are now product-neutral:
+> the display name lives in one constant, `APP_NAME` in `src/lib/constants.ts`
+> (the browser title, home-screen label and export file names all follow it).
+> The GitHub repo and Vercel projects keep their old names.
 
 Phone-first web app for tracking football jersey inventory and sales.
 
@@ -55,8 +60,8 @@ src/
   in the product editor; the workspace config only supplies the field names and
   the default values a new product starts with.
 - **SKU** = style + variant + size → integer qty.
-  - jersey defaults — variants: Hjemme – Fan, Hjemme – Player, Borte – Fan,
-    Borte – Player; sizes: S, M, L, XL, XXL, 3XL
+  - generic defaults — variants: Standard; sizes: XS, S, M, L, XL, XXL
+    (the original jersey workspace used Hjemme/Borte × Fan/Player and S–3XL)
 - **Transaction** = a sale (`salg`) or giveaway (`gitt_bort`). Saving decrements
   stock; deleting restores it. Each item snapshots `styleName` so history
   survives style deletion.
@@ -175,11 +180,12 @@ After setting them, trigger a redeploy (push a commit, or `vercel --prod`, or
 
 ### Add to Home Screen — iPhone (Safari)
 
-1. Open your Vercel URL (e.g. `https://draktlager.vercel.app`) in **Safari**
+1. Open your Vercel URL (e.g. `https://pmoney-peach.vercel.app`) in **Safari**
    (must be Safari, not Chrome, for iOS install).
 2. Tap the **Share** button (square with an up-arrow, bottom centre).
 3. Scroll down and tap **"Legg til på Hjem-skjerm" / "Add to Home Screen"**.
-4. The name **Draktlager** and the green jersey icon appear — tap **Legg til / Add**.
+4. The name **Varelager** and the green box icon appear — tap **Legg til / Add**.
+   (Already installed? Remove the old icon and add it again to pick up a new name/icon — iOS doesn't refresh them.)
 5. Launch it from the home-screen icon: it opens full-screen with no Safari
    chrome, like a native app, and works offline for viewing.
 
@@ -200,9 +206,11 @@ The product model is configurable per workspace via **Mer → Innstillinger**:
   list of **default values**. Jerseys use Variant × Størrelse; another seller
   might use Farge × Størrelse, or just "Kategori".
 
-The whole app (sale form, stock grid, log, stats, CSV) follows the config. The
-default config reproduces the original jersey setup, so an existing workspace is
-unchanged.
+The whole app (sale form, stock grid, log, stats, CSV) follows the config. A
+brand-new workspace starts with a generic Produkt × Variant × Størrelse setup;
+an existing workspace keeps whatever it has saved. Keep the product label to one
+short word — it is dropped into sentences like «+ Ny produkt» and «Navn på
+produkt».
 
 ### Per-product values (since migration 005)
 

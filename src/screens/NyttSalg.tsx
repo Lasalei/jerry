@@ -197,8 +197,8 @@ export function NyttSalg() {
 
         {!hasStyles && (
           <Card className="p-4 text-sm text-muted">
-            Du har ingen {config.productLabel.toLowerCase()}er ennå. Gå til{' '}
-            <strong>Lager</strong> og legg til en først.
+            Lageret er tomt. Gå til <strong>Lager</strong> og trykk{' '}
+            <strong>+ Ny {config.productLabel.toLowerCase()}</strong> først.
           </Card>
         )}
 

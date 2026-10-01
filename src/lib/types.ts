@@ -1,4 +1,4 @@
-// Domain model for Draktlager.
+// Domain model for Varelager (the inventory + sales PWA, formerly Draktlager).
 
 // The two product axes are configurable per workspace (see AppConfig). They were
 // once jersey-specific unions ("Hjemme – Fan" / "S".."3XL"); now they are plain
@@ -20,7 +20,7 @@ export interface ProductField {
 
 /** Per-workspace configuration of what a "product" is and its 1–2 axes. */
 export interface AppConfig {
-  /** What one product is called, e.g. "Stil" (jerseys) or "Produkt". */
+  /** What one product is called, e.g. "Produkt", "Vare" or "Stil". */
   productLabel: string
   /** Always present; maps to the `variant` column. */
   field1: ProductField
@@ -37,7 +37,7 @@ export type Carrier = 'Posten' | 'PostNord' | 'Helthjem' | 'Annet'
 
 export type TxType = 'salg' | 'gitt_bort'
 
-/** A product (jersey style = one team/design, e.g. "Liverpool 24/25"). */
+/** A product, e.g. "Nike svart t-skjorte" (historically a jersey style). */
 export interface Style {
   id: string
   name: string

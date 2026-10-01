@@ -7,6 +7,7 @@ import { exportJSON, exportSalesCSV, parseImport } from '../lib/exporters'
 import { computeStats } from '../lib/stats'
 import { formatKr } from '../lib/format'
 import { isRemote } from '../lib/db'
+import { APP_NAME } from '../lib/constants'
 
 function ActionRow({
   title,
@@ -78,7 +79,7 @@ export function Mer({ onOpenSettings }: { onOpenSettings: () => void }) {
       const snapshot = parseImport(text)
       const ok = await confirm({
         title: 'Importere data?',
-        message: `Dette erstatter ALT som ligger her nå med ${snapshot.styles.length} stiler og ${snapshot.transactions.length} oppføringer.`,
+        message: `Dette erstatter ALT som ligger her nå med ${snapshot.styles.length} produkter og ${snapshot.transactions.length} oppføringer.`,
         confirmLabel: 'Importer',
         danger: true,
       })
@@ -171,10 +172,10 @@ export function Mer({ onOpenSettings }: { onOpenSettings: () => void }) {
           {isRemote ? (
             <>
               <span className="mr-1 inline-block h-2 w-2 rounded-full bg-kit align-middle" />
-              Draktlager · synkronisert live (Supabase)
+              {APP_NAME} · synkronisert live
             </>
           ) : (
-            'Draktlager · lagrer lokalt på denne enheten'
+            `${APP_NAME} · lagrer lokalt på denne enheten`
           )}
         </p>
       </div>

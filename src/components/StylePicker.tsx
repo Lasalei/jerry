@@ -12,7 +12,7 @@ export function StylePicker({
   value,
   onChange,
   styleTotal,
-  placeholder = 'Søk etter stil…',
+  placeholder = 'Søk…',
 }: {
   styles: Style[]
   value: string

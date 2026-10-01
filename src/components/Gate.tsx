@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { PrimaryButton, controlClass } from './ui'
+import { APP_NAME } from '../lib/constants'
 
 const PASSCODE = import.meta.env.VITE_APP_PASSCODE
 const UNLOCK_KEY = 'draktlager_unlocked'
@@ -32,7 +33,7 @@ export function Gate({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh items-center justify-center bg-canvas px-6">
       <form onSubmit={submit} className="w-full max-w-xs space-y-4 text-center">
         <h1 className="font-display text-4xl font-bold uppercase tracking-wide text-kit">
-          Draktlager
+          {APP_NAME}
         </h1>
         <p className="text-sm text-muted">Skriv inn passord for å fortsette</p>
         <input

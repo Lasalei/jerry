@@ -1,7 +1,12 @@
 import type { DataSnapshot } from './types'
-import { DEFAULT_CONFIG } from './constants'
+import { APP_NAME, DEFAULT_CONFIG } from './constants'
 import { normalizeStyle } from './axes'
 import { todayISO } from './format'
+
+/** File-name-safe version of the app name, e.g. "varelager". */
+function filePrefix(): string {
+  return APP_NAME.toLowerCase().replace(/[^a-z0-9æøå]+/g, '-').replace(/^-|-$/g, '') || 'app'
+}
 
 /** Trigger a browser download of a Blob. */
 function download(filename: string, blob: Blob) {
@@ -20,7 +25,7 @@ export function exportJSON(data: DataSnapshot) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: 'application/json',
   })
-  download(`draktlager-backup-${todayISO()}.json`, blob)
+  download(`${filePrefix()}-backup-${todayISO()}.json`, blob)
 }
 
 function csvField(value: string | number): string {
@@ -95,7 +100,7 @@ export function exportSalesCSV(data: DataSnapshot) {
   const blob = new Blob(['﻿' + rows.join('\r\n')], {
     type: 'text/csv;charset=utf-8',
   })
-  download(`draktlager-salg-${todayISO()}.csv`, blob)
+  download(`${filePrefix()}-salg-${todayISO()}.csv`, blob)
 }
 
 /** Parse + minimally validate an imported JSON backup. Throws on bad shape. */
